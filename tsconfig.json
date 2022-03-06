@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+      "module": "commonjs",
+      "target": "es6",
+      "lib": ["ES2020"],
+      "esModuleInterop": true,
+      "moduleResolution": "node",
+      "noImplicitAny": true,
+      "strict": true,
+      "strictNullChecks": true,
+      "declaration": true,
+      "sourceMap": true,
+      "outDir": "dist",
+      "baseUrl": "./src",
+  },
+
+  "include": ["src/"]
+}
