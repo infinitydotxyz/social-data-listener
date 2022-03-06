@@ -1,7 +1,10 @@
 # social-data-listener
 
 ## installation
-`npm i`
+```
+$ npm i
+$ cp .env.example .env
+```
 
 ## development
 Start the CLI program and watch for changes:
