@@ -1,20 +1,22 @@
-import { ALL_COLLECTIONS, initDb, SOCIALS } from './database';
+import { COLLECTIONS, initDb } from './database';
 import serviceAccount from './database/creds/nftc-dev-firebase-creds.json';
-import { Links } from '@infinityxyz/types/core';
+import { Links, Collection } from '@infinityxyz/types/core';
+import { config as loadEnv } from 'dotenv';
+
+loadEnv();
 
 const db = initDb(serviceAccount);
 
 main();
 
 async function main() {
-  const verifiedCollections = await db.collection(ALL_COLLECTIONS).where('hasBlueCheck', '==', true).select('socials').get();
+  const verifiedCollections = await db.collection(COLLECTIONS).where('hasBlueCheck', '==', true).select('metadata.links').get();
 
-  verifiedCollections.forEach(async (col) => {
-    const snapshot = await col.ref.collection(SOCIALS).doc('links').get();
-    if (snapshot.exists) {
-      const { twitter, discord } = snapshot.data() as Links;
-      console.log(twitter, discord);
-    }
+  verifiedCollections.forEach((doc) => {
+    const { metadata } = doc.data() as Collection;
+    const twitter = metadata.links.twitter;
+    const discord = metadata.links.discord;
+    console.log(twitter, discord);
   });
 
   // TODO: when a new verified collection gets added to the db, we should automatically start watching it too (stream?)

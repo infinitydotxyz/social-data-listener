@@ -1,6 +1,6 @@
 import firebaseAdmin from 'firebase-admin';
 
-export const ALL_COLLECTIONS = 'allCollections';
+export const COLLECTIONS = 'collections';
 export const SOCIALS = 'socials';
 
 /**
