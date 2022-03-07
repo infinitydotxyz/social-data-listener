@@ -2,7 +2,7 @@ import { COLLECTIONS, initDb } from './database';
 import serviceAccount from './database/creds/nftc-dev-firebase-creds.json';
 import { Collection } from '@infinityxyz/types/core';
 import { config as loadEnv } from 'dotenv';
-import Twitter from './twitter';
+import { Twitter } from './twitter';
 
 // load environment vars
 loadEnv();
