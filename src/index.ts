@@ -12,7 +12,7 @@ const db = initDb(serviceAccount);
 const twitter = new Twitter({
   apiKey: process.env.TWITTER_API_KEY!,
   apiKeySecret: process.env.TWITTER_API_KEY_SECRET!,
-  bearerToken: process.env.TWITTER_API_KEY_BEARER_TOKEN,
+  bearerToken: process.env.TWITTER_BEARER_TOKEN,
   accessToken: process.env.TWITTER_ACCESS_TOKEN,
   accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
 });
