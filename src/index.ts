@@ -22,22 +22,6 @@ main();
 async function main() {
   // TODO: when a new verified collection gets added to the db, we should automatically start watching it too (stream firestore collection updates somehow?)
 
-  // TODO: write test with the following data (turns out this is exactly 512 in charlength, just enough to test AccessLevel.Essential lmao):
-  /* twitter.updateStreamRules([
-    'goatlodge',       'BattleVerse_io',
-    'chromorphs',      'bullsontheblock',
-    'JohnOrionYoung',  'the_n_project_',
-    'superplastic',    'PixlsOfficial',
-    'LuckyManekiNFT',  'TheProjectURS',
-    'robotosNFT',      'satoshibles',
-    'SaconiGen',       'FatalesNFT',
-    '10KTFShop',       'nahfungiblebone',
-    'lostsoulsnft',    'DropBearsio',
-    'cryptoadzNFT',    'MekaVerse',
-    'boredapeyc',      'pudgy_penguins',
-    'worldofwomennft',
-  ]); */
-
   const verifiedCollections = await db.collection(COLLECTIONS).where('hasBlueCheck', '==', true).select('metadata.links').get();
 
   console.log(`Watching ${verifiedCollections.size} verified collections...`);

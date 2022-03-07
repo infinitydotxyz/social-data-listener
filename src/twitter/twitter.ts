@@ -6,16 +6,15 @@ export class Twitter {
   private api: TwitterApi;
 
   constructor(options: TwitterConfig) {
-    if (!options.apiKey || !options.apiKeySecret) throw new Error('Missing API keys! Check your environment variables.');
-
-    this.api = new TwitterApi(options.bearerToken!);
+    if (!options.bearerToken) throw new Error('Bearer token must be set!');
+    this.api = new TwitterApi(options.bearerToken);
   }
 
   /**
    * Extracts the twitter handle from a twitter URL.
    */
   static extractHandle(url: string) {
-    const split = url.split('/');
+    const split = url.replace(/\/+$/, '').split('/');
     return split[split.length - 1];
   }
 
@@ -33,14 +32,14 @@ export class Twitter {
    *
    * Example resulting rule: `(from:sleeyax OR from:jfrazier) -is:retweet -is:reply -is:quote`
    */
-  private buildRules(
+  buildStreamRules(
     accounts: string[],
     accessLevel: AccessLevel = AccessLevel.Essential,
     filter: string = '-is:retweet -is:reply -is:quote'
   ): StreamingV2AddRulesParams {
     // TODO: check if there's a more performant (but also readable) way to do this...
 
-    const placeholder = `() ${filter}`;
+    const placeholder = `()${filter.length > 0 ? ' ' + filter : ''}`;
     const concatenator = ' OR ';
     const rules: Array<{ value: string }> = [];
     const maxRules = ruleLimitations[accessLevel];
@@ -82,7 +81,7 @@ export class Twitter {
    * @link https://developer.twitter.com/en/docs/twitter-api/tweets/filtered-stream/introduction
    */
   async updateStreamRules(accounts: string[]) {
-    const rules = this.buildRules(accounts);
+    const rules = this.buildStreamRules(accounts);
     const res = await this.api.v2.updateStreamRules(rules);
     return res.data;
   }

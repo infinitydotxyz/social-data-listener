@@ -16,14 +16,14 @@ type TwitterConfig = {
    * Think of the API key as the user name that represents your App when making API requests.
    * It helps Tiwtter verify who you are.
    */
-  apiKey: string;
+  apiKey?: string;
 
   /**
    * API Key Secret.
    *
    * Your API Key Secret is like a password and helps verify your API Key.
    */
-  apiKeySecret: string;
+  apiKeySecret?: string;
 
   /**
    * Bearer Token.
