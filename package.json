@@ -2,7 +2,7 @@
   "name": "social-data-listener",
   "version": "1.0.0",
   "description": "Fetches data from several platforms and stores it in the database for further processing",
-  "main": "dist/index.js",
+  "main": "dist/main.js",
   "scripts": {
     "test": "jest",
     "prepare": "husky install",
