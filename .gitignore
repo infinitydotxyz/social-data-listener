@@ -2,3 +2,4 @@ node_modules
 dist
 **/creds/*.json
 .env
+.npmrc
