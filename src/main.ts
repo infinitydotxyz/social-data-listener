@@ -1,6 +1,6 @@
 import { COLLECTIONS, initDb } from './database';
 import serviceAccount from './database/creds/nftc-dev-firebase-creds.json';
-import { Collection } from '@infinityxyz/types/core';
+import { Collection } from '@infinityxyz/lib/types/core';
 import { config as loadEnv } from 'dotenv';
 import { Twitter } from './twitter';
 import { Discord } from './discord';
@@ -17,13 +17,17 @@ const twitter = new Twitter({
   accessToken: process.env.TWITTER_ACCESS_TOKEN,
   accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
 });
+const discord = new Discord({
+  token: process.env.DISCORD_TOKEN!
+});
 
 main();
 
 async function main() {
   // TODO: when a new verified collection gets added to the db, we should automatically start watching it too (stream firestore collection updates somehow?)
+  // TODO: store in firebase
 
-  /* const verifiedCollections = await db.collection(COLLECTIONS).where('hasBlueCheck', '==', true).select('metadata.links').get();
+  const verifiedCollections = await db.collection(COLLECTIONS).where('hasBlueCheck', '==', true).select('metadata.links').get();
 
   console.log(`Watching ${verifiedCollections.size} verified collections...`);
 
@@ -32,14 +36,13 @@ async function main() {
     .filter((url) => url?.trim() != '')
     .map((url) => Twitter.extractHandle(url!));
 
-  await twitter.updateStreamRules(twitterAccounts);
-  // TODO: store in firebase
-  await twitter.streamTweets(console.log); */ // this should keep running forever. when we add discord we can hopefully use Promise.all(), without the need for thread workers.
-
-  // https://discord.com/api/oauth2/authorize?client_id=952882439838130236&permissions=1024&scope=bot
-  const discordBot = new Discord({
-    token: process.env.DISCORD_TOKEN!
+  let discordChannels: Set<string> = new Set();
+  verifiedCollections.forEach((snapshot) => {
+    const collection = snapshot.data() as Collection;
+    const channels = collection.metadata.integrations?.discord?.channels ?? [];
+    for (const channel of channels) discordChannels.add(channel);
   });
 
-  await discordBot.monitor();
+  await twitter.updateStreamRules(twitterAccounts);
+  await Promise.all([discord.monitor(discordChannels), twitter.streamTweets(console.log)]);
 }

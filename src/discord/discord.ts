@@ -13,7 +13,8 @@ export class Discord {
    *
    * Owners of verified collections are able to add this bot to their server.
    */
-  async monitor() {
+  async monitor(channels: Set<string>) {
+    console.log(channels);
     const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 
     client.once('ready', () => {
@@ -21,7 +22,9 @@ export class Discord {
     });
 
     client.on('message', (msg) => {
-      console.log(msg.content);
+      if (channels.has(msg.channelId)) {
+        console.log(msg.content);
+      }
     });
 
     await client.login(this.config.token);
