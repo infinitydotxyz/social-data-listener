@@ -3,7 +3,7 @@ import serviceAccount from './database/creds/nftc-dev-firebase-creds.json';
 import { Collection } from '@infinityxyz/lib/types/core';
 import { config as loadEnv } from 'dotenv';
 import { Twitter } from './twitter';
-import { Discord } from './discord';
+import { Discord, isDiscordIntegration } from './discord';
 
 // load environment vars
 loadEnv();
@@ -18,7 +18,8 @@ const twitter = new Twitter({
   accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
 });
 const discord = new Discord({
-  token: process.env.DISCORD_TOKEN!
+  token: process.env.DISCORD_TOKEN!,
+  appId: process.env.DISCORD_APP_ID!
 });
 
 main();
@@ -36,13 +37,10 @@ async function main() {
     .filter((url) => url?.trim() != '')
     .map((url) => Twitter.extractHandle(url!));
 
-  let discordChannels: Set<string> = new Set();
-  verifiedCollections.forEach((snapshot) => {
-    const collection = snapshot.data() as Collection;
-    const channels = collection.metadata.integrations?.discord?.channels ?? [];
-    for (const channel of channels) discordChannels.add(channel);
-  });
+  const discords = verifiedCollections.docs
+    .map((snapshot) => (snapshot.data() as Collection).metadata.integrations?.discord)
+    .filter(isDiscordIntegration);
 
   await twitter.updateStreamRules(twitterAccounts);
-  await Promise.all([discord.monitor(discordChannels), twitter.streamTweets(console.log)]);
+  await Promise.all([discord.monitor(discords), twitter.streamTweets(console.log)]);
 }
