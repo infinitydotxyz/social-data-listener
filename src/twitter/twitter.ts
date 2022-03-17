@@ -1,8 +1,10 @@
-import { StreamingV2AddRulesParams, TweetV2, TwitterApi } from 'twitter-api-v2';
+import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { StreamingV2AddRulesParams, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
+import Listener, { OnEvent } from '../listener';
 import TwitterConfig, { AccessLevel } from './config';
 import { ruleLengthLimitations, ruleLimitations } from './limitations';
 
-export class Twitter {
+export class Twitter implements Listener<TwitterTweetEvent> {
   private api: TwitterApi;
 
   constructor(options: TwitterConfig) {
@@ -108,13 +110,39 @@ export class Twitter {
   /**
    * Starts listening to a stream of tweets from all twitter users we have set in {@link updateStreamRules}.
    */
-  async streamTweets(onTweet: (tweet: TweetV2) => void) {
+  private async streamTweets(onTweet: (tweet: TweetV2SingleStreamResult) => void) {
     const stream = await this.api.v2.searchStream({
-      autoConnect: true
+      autoConnect: true,
+      expansions: 'author_id,attachments.media_keys',
+      'tweet.fields': 'author_id,created_at,id,lang,possibly_sensitive,source,text',
+      'user.fields': 'location,name,profile_image_url,username,verified',
+      'media.fields': 'height,width,preview_image_url,type,url,alt_text'
     });
 
-    for await (const { data } of stream) {
-      onTweet(data);
+    for await (const item of stream) {
+      onTweet(item);
     }
+  }
+
+  monitor(handler: OnEvent<TwitterTweetEvent>): void {
+    this.streamTweets((tweet) => {
+      const media = tweet.includes?.media?.[0];
+      const user = tweet.includes?.users?.[0];
+
+      return handler({
+        id: tweet.data.id,
+        type: FeedEventType.TwitterTweet,
+        authorId: tweet.data.author_id,
+        comments: 0,
+        likes: 0,
+        isSensitive: tweet.data.possibly_sensitive ?? false,
+        language: tweet.data.lang ?? '',
+        timestamp: new Date(tweet.data.created_at ?? new Date()).getTime(),
+        image: media?.url ?? '',
+        source: tweet.data.source ?? '',
+        text: tweet.data.text ?? '',
+        username: user?.username ?? ''
+      });
+    });
   }
 }

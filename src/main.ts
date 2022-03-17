@@ -4,6 +4,7 @@ import { Collection } from '@infinityxyz/lib/types/core';
 import { config as loadEnv } from 'dotenv';
 import { Twitter } from './twitter';
 import { Discord, isDiscordIntegration } from './discord';
+import { BaseFeedEvent, FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 
 // load environment vars
 loadEnv();
@@ -26,21 +27,46 @@ main();
 
 async function main() {
   // TODO: when a new verified collection gets added to the db, we should automatically start watching it too (stream firestore collection updates somehow?)
-  // TODO: store in firebase
 
-  const verifiedCollections = await db.collection(COLLECTIONS).where('hasBlueCheck', '==', true).select('metadata.links').get();
+  const verifiedCollections = await db
+    .collection(COLLECTIONS)
+    .where('hasBlueCheck', '==', true)
+    .select('metadata.links.twitter', 'address')
+    .get();
 
   console.log(`Watching ${verifiedCollections.size} verified collections...`);
 
+  // store all twitter accounts in memory
   const twitterAccounts = verifiedCollections.docs
-    .map((snapshot) => (snapshot.data() as Collection).metadata.links.twitter)
-    .filter((url) => url?.trim() != '')
-    .map((url) => Twitter.extractHandle(url!));
+    .map((snapshot) => {
+      const { metadata, address } = snapshot.data() as Collection;
+      const url = metadata.links.twitter;
+      return { handle: url ? Twitter.extractHandle(url) : undefined, address };
+    })
+    .filter((data) => data.handle?.trim() != '');
 
+  // store all discord servers in memory
   const discords = verifiedCollections.docs
     .map((snapshot) => (snapshot.data() as Collection).metadata.integrations?.discord)
     .filter(isDiscordIntegration);
 
-  await twitter.updateStreamRules(twitterAccounts);
-  await Promise.all([discord.monitor(discords), twitter.streamTweets(console.log)]);
+  // writes an event to the database
+  // the collection address that the event belongs should be found in memory
+  const writer = async (event: BaseFeedEvent) => {
+    console.log(event);
+    if (event.type === FeedEventType.TwitterTweet) {
+      const twitterEvent = event as TwitterTweetEvent;
+      const collectionAddress = twitterAccounts.find((account) => account.handle === twitterEvent.username);
+      if (collectionAddress)
+        await db
+          .collection(COLLECTIONS)
+          .doc(twitterEvent.id)
+          .set({ collectionAddress, ...event });
+    } else {
+      // TODO: discord
+    }
+  };
+
+  await twitter.updateStreamRules(twitterAccounts.map((account) => account.handle!));
+  await Promise.all([discord.monitor(discords), twitter.monitor(writer)]);
 }

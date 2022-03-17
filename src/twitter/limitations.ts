@@ -1,5 +1,8 @@
 import { AccessLevel } from './config';
 
+/**
+ * Tiwtter API access limitations.
+ */
 export type Limitations = {
   [accessLevel: number]: number;
 };
