@@ -1,6 +1,8 @@
-import { COLLECTIONS, initDb } from './database';
+import { initDb } from './database';
 import serviceAccount from './database/creds/nftc-dev-firebase-creds.json';
 import { Collection } from '@infinityxyz/lib/types/core';
+import { firestoreConstants } from '@infinityxyz/lib/utils';
+
 import { config as loadEnv } from 'dotenv';
 import { Twitter } from './twitter';
 import { Discord, isDiscordIntegration } from './discord';
@@ -29,7 +31,7 @@ async function main() {
   // TODO: when a new verified collection gets added to the db, we should automatically start watching it too (stream firestore collection updates somehow?)
 
   const verifiedCollections = await db
-    .collection(COLLECTIONS)
+    .collection(firestoreConstants.COLLECTIONS_COLL)
     .where('hasBlueCheck', '==', true)
     .select('metadata.links.twitter', 'address')
     .get();
@@ -56,12 +58,12 @@ async function main() {
     console.log(event);
     if (event.type === FeedEventType.TwitterTweet) {
       const twitterEvent = event as TwitterTweetEvent;
-      const collectionAddress = twitterAccounts.find((account) => account.handle === twitterEvent.username);
-      if (collectionAddress)
+      const account = twitterAccounts.find((account) => account.handle?.toLowerCase() === twitterEvent.username.toLowerCase());
+      if (account)
         await db
-          .collection(COLLECTIONS)
+          .collection(firestoreConstants.FEED_COLL)
           .doc(twitterEvent.id)
-          .set({ collectionAddress, ...event });
+          .set({ collectionAddress: account.address, ...event });
     } else {
       // TODO: discord
     }

@@ -1,8 +1,5 @@
 import firebaseAdmin from 'firebase-admin';
 
-export const COLLECTIONS = 'collections';
-export const SOCIALS = 'socials';
-
 /**
  * Creates a new connection to the database and returns the instance (if successful).
  */
