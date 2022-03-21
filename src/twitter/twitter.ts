@@ -17,16 +17,31 @@ export class Twitter implements Listener<TwitterTweetEvent> {
    */
   static extractHandle(url: string) {
     const split = url.replace(/\/+$/, '').split('/');
-    return split[split.length - 1];
+    return split[split.length - 1].replace('@', '');
+  }
+
+  /**
+   * Appends a twitter handle to the twitter URL.
+   */
+  static appendHandle(handle: string) {
+    return 'https://twitter.com/' + handle;
   }
 
   /**
    * Fetches all configured stream rule ids.
    */
+  async getStreamRuleIds() {
+    const rules = await this.getStreamRules();
+    const ids = rules.map((rule) => rule.id);
+    return ids;
+  }
+
+  /**
+   * Fetches all configured stream rules.
+   */
   async getStreamRules() {
     const res = await this.api.v2.streamRules();
-    const ids = res.data?.map((rule) => rule.id) ?? [];
-    return ids;
+    return res.data ?? [];
   }
 
   /**
@@ -41,7 +56,7 @@ export class Twitter implements Listener<TwitterTweetEvent> {
   ): StreamingV2AddRulesParams {
     // TODO: check if there's a more performant (but also readable) way to do this...
 
-    const placeholder = `()${filter.length > 0 ? ' ' + filter : ''}`;
+    const placeholder = `()${filter.length ? ' ' + filter : ''}`;
     const concatenator = ' OR ';
     const rules: Array<{ value: string }> = [];
     const maxRules = ruleLimitations[accessLevel];
@@ -67,8 +82,14 @@ export class Twitter implements Listener<TwitterTweetEvent> {
     if (offset < fromAccounts.length)
       rules.push({ value: placeholder.replace('()', `(${fromAccounts.slice(offset, fromAccounts.length).join(concatenator)})`) });
 
-    if (rules.length > maxRules)
-      console.warn(`Max number of stream rules reached (${rules.length}/${maxRules}). Twitter might complain about this!`);
+    if (rules.length > maxRules) {
+      console.warn(
+        `Max number of stream rules reached (${rules.length}/${maxRules}). Rules that exceed this limit will be stripped to avoid API errors!`
+      );
+      return {
+        add: rules.slice(0, maxRules)
+      };
+    }
 
     return {
       add: rules
@@ -85,6 +106,10 @@ export class Twitter implements Listener<TwitterTweetEvent> {
   async updateStreamRules(accounts: string[]) {
     const rules = this.buildStreamRules(accounts);
     const res = await this.api.v2.updateStreamRules(rules);
+    if (res.errors?.length) {
+      console.error(res.errors);
+      throw new Error('Failed to update stream rules. See the API error above.');
+    }
     return res.data;
   }
 
@@ -94,7 +119,7 @@ export class Twitter implements Listener<TwitterTweetEvent> {
    * The stream will become empty until we add accounts again.
    */
   async deleteStreamRules() {
-    const ids = await this.getStreamRules();
+    const ids = await this.getStreamRuleIds();
 
     if (ids.length == 0) return;
 

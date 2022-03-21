@@ -28,47 +28,84 @@ const discord = new Discord({
 main();
 
 async function main() {
-  // TODO: when a new verified collection gets added to the db, we should automatically start watching it too (stream firestore collection updates somehow?)
+  const query = db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
-  const verifiedCollections = await db
-    .collection(firestoreConstants.COLLECTIONS_COLL)
-    .where('hasBlueCheck', '==', true)
-    .select('metadata.links.twitter', 'address')
-    .get();
-
-  console.log(`Watching ${verifiedCollections.size} verified collections...`);
-
-  // store all twitter accounts in memory
-  const twitterAccounts = verifiedCollections.docs
-    .map((snapshot) => {
-      const { metadata, address } = snapshot.data() as Collection;
-      const url = metadata.links.twitter;
-      return { handle: url ? Twitter.extractHandle(url) : undefined, address };
-    })
-    .filter((data) => data.handle?.trim() != '');
+  await configureTwitterApi(query);
 
   // store all discord servers in memory
-  const discords = verifiedCollections.docs
+  /*  const discords = query.docs
     .map((snapshot) => (snapshot.data() as Collection).metadata.integrations?.discord)
-    .filter(isDiscordIntegration);
+    .filter(isDiscordIntegration); */
 
   // writes an event to the database
   // the collection address that the event belongs should be found in memory
   const writer = async (event: BaseFeedEvent) => {
     console.log(event);
+
     if (event.type === FeedEventType.TwitterTweet) {
       const twitterEvent = event as TwitterTweetEvent;
-      const account = twitterAccounts.find((account) => account.handle?.toLowerCase() === twitterEvent.username.toLowerCase());
-      if (account)
+
+      // find the nft collection ID that belongs to this event
+      const snapshot = await db
+        .collection(firestoreConstants.COLLECTIONS_COLL)
+        .select('id')
+        .where('metadata.links.twitter', '==', Twitter.appendHandle(twitterEvent.username))
+        .limit(1)
+        .get();
+
+      if (snapshot.docs.length) {
+        const doc = snapshot.docs[0];
         await db
           .collection(firestoreConstants.FEED_COLL)
           .doc(twitterEvent.id)
-          .set({ collectionAddress: account.address, ...event });
+          .set({ collectionAddress: doc.data().address, ...event });
+      } else {
+        console.warn('Twitter event received but not stored in db!');
+      }
     } else {
       // TODO: discord
     }
   };
 
-  await twitter.updateStreamRules(twitterAccounts.map((account) => account.handle!));
-  await Promise.all([discord.monitor(discords), twitter.monitor(writer)]);
+  await Promise.all([
+    // discord.monitor(discords),
+    twitter.monitor(writer)
+  ]);
+}
+
+async function configureTwitterApi(query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData>) {
+  await twitter.deleteStreamRules();
+
+  const unsubscribe = query.onSnapshot(async (snapshot) => {
+    const changes = snapshot.docChanges();
+
+    const twitterHandlesAdded = changes
+      .filter((change) => change.type === 'added' && change.doc.data().metadata?.links?.twitter)
+      .map((change) => Twitter.extractHandle(change.doc.data().metadata.links.twitter))
+      .filter((handle) => !!handle.trim());
+
+    // TODO: properly handle 'modified' and 'removed' documents.
+    // The problem is that we can't exactly delete or modify one exact rule because atm one rule monitors multiple accounts.
+    // We might be able to get around this limitation once we can apply many more (and preferably unlimited) rules per twitter handle via some kind of commercial API access.
+    // For the time being, we just inefficiently re-create the rule from scratch whenever a document is deleted or modified (only when twitter url changed).
+    if (
+      changes.some(
+        (change) =>
+          (change.type === 'modified' &&
+            !snapshot.docs.some((old) => old.data().metadata?.links?.twitter === change.doc.data().metadata?.links?.twitter)) ||
+          change.type === 'removed'
+      )
+    ) {
+      console.log(`Resetting twitter streaming API rules (document modified or deleted)`);
+      unsubscribe();
+      return await configureTwitterApi(query);
+    }
+
+    if (twitterHandlesAdded.length) {
+      console.log(`Monitoring ${twitterHandlesAdded.length} new twitter handles`);
+      await twitter.updateStreamRules(twitterHandlesAdded);
+    }
+  });
+
+  return unsubscribe;
 }
