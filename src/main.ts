@@ -32,44 +32,42 @@ async function main() {
 
   await configureTwitterApi(query);
 
-  // store all discord servers in memory
-  /*  const discords = query.docs
-    .map((snapshot) => (snapshot.data() as Collection).metadata.integrations?.discord)
-    .filter(isDiscordIntegration); */
-
   // writes an event to the database
   // the collection address that the event belongs should be found in memory
   const writer = async (event: BaseFeedEvent) => {
     console.log(event);
 
-    if (event.type === FeedEventType.TwitterTweet) {
-      const twitterEvent = event as TwitterTweetEvent;
+    switch (event.type) {
+      case FeedEventType.TwitterTweet:
+        const twitterEvent = event as TwitterTweetEvent;
 
-      // find the nft collection ID that belongs to this event
-      const snapshot = await db
-        .collection(firestoreConstants.COLLECTIONS_COLL)
-        .select('id')
-        .where('metadata.links.twitter', '==', Twitter.appendHandle(twitterEvent.username))
-        .limit(1)
-        .get();
+        // find the nft collection ID that belongs to this event
+        const snapshot = await db
+          .collection(firestoreConstants.COLLECTIONS_COLL)
+          .select('id')
+          .where('metadata.links.twitter', '==', Twitter.appendHandle(twitterEvent.username))
+          .limit(1)
+          .get();
 
-      if (snapshot.docs.length) {
-        const doc = snapshot.docs[0];
-        await db
-          .collection(firestoreConstants.FEED_COLL)
-          .doc(twitterEvent.id)
-          .set({ collectionAddress: doc.data().address, ...event });
-      } else {
-        console.warn('Twitter event received but not stored in db!');
-      }
-    } else {
-      // TODO: discord
+        if (snapshot.docs.length) {
+          const doc = snapshot.docs[0];
+          await db
+            .collection(firestoreConstants.FEED_COLL)
+            .doc(twitterEvent.id)
+            .set({ collectionAddress: doc.data().address, ...event });
+        } else {
+          console.warn('Twitter event received but not stored in db!');
+        }
+        break;
+      case FeedEventType.DiscordAnnouncement:
+        // TODO: discord
+        break;
     }
   };
 
   await Promise.all([
-    // discord.monitor(discords),
-    twitter.monitor(writer)
+    discord.monitor(writer)
+    // twitter.monitor(writer)
   ]);
 }
 

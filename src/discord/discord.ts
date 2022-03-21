@@ -4,10 +4,14 @@ import { DiscordIntegration } from '@infinityxyz/lib/types/core';
 import { Routes } from 'discord-api-types/v9';
 import { SlashCommandBuilder, SlashCommandSubcommandBuilder } from '@discordjs/builders';
 import { REST } from '@discordjs/rest';
+import Listener, { OnEvent } from '../listener';
+import { BaseFeedEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
+import { getDb } from '../database';
+import { firestoreConstants } from '@infinityxyz/lib/utils';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
-export class Discord {
+export class Discord implements Listener<BaseFeedEvent> {
   private readonly config: DiscordConfig;
 
   constructor(config: DiscordConfig) {
@@ -42,7 +46,7 @@ export class Discord {
    *
    * Owners of verified collections are able to add this bot to their server.
    */
-  async monitor(discords: DiscordIntegration[]) {
+  async monitor(handler: OnEvent<BaseFeedEvent>) {
     const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 
     client.once('ready', () => {
@@ -61,15 +65,29 @@ export class Discord {
 
       if (commandName === 'infinity' && options.getSubcommand() === 'verify') {
         const address = options.getString('address');
+        // TODO: Verify based on unique token instead of guild id (Slightly better security, though unlikely a collection owner is gonna input a wrong guild id to sabotage themselves. The collection address is already securely verified.)
         interaction.reply(
           `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`
         );
       }
     });
 
-    client.on('message', (msg) => {
-      if (discords.some((discord) => discord.guildId === msg.guildId && discord.channels?.includes(msg.channelId))) {
-        console.log(msg.content);
+    client.on('message', async (msg) => {
+      const db = getDb(); // TODO: DI
+      const integrations = await db
+        .collection(firestoreConstants.COLLECTIONS_COLL)
+        .select('metadata.integrations.discord')
+        .where('metadata.integrations.discord.guildId', '==', msg.guildId)
+        .where('metadata.integrations.discord.channels', 'array-contains', msg.channelId)
+        .get();
+      if (integrations.size) {
+        // TODO: create discord event
+        handler({
+          type: FeedEventType.DiscordAnnouncement,
+          comments: 0,
+          likes: 0,
+          timestamp: Date.now()
+        });
       }
     });
 
