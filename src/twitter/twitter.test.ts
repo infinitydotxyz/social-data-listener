@@ -7,11 +7,19 @@ test('should convert Twitter URL to handle', () => {
   expect(Twitter.extractHandle(url)).toBe(expected);
   expect(Twitter.extractHandle(url + '/')).toBe(expected);
   expect(Twitter.extractHandle(url + '///')).toBe(expected);
+  expect(Twitter.extractHandle('sleeyax')).toBe(expected);
+  expect(Twitter.extractHandle('@sleeyax')).toBe(expected);
+});
+
+test('should convert handle to URL', () => {
+  const handle = 'sleeyax';
+  const expected = 'https://twitter.com/sleeyax';
+  expect(Twitter.appendHandle(handle)).toBe(expected);
 });
 
 test('should build stream rules from twitter accounts', () => {
   const twitter = new Twitter({ bearerToken: 'test' });
-  const accounts = [
+  let accounts = [
     'goatlodge',
     'BattleVerse_io',
     'chromorphs',
