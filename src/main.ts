@@ -5,8 +5,13 @@ import { firestoreConstants } from '@infinityxyz/lib/utils';
 
 import { config as loadEnv } from 'dotenv';
 import { Twitter } from './twitter';
-import { Discord, isDiscordIntegration } from './discord';
-import { BaseFeedEvent, FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { Discord } from './discord';
+import {
+  BaseFeedEvent,
+  DiscordAnnouncementEvent as DiscordEvent,
+  FeedEventType,
+  TwitterTweetEvent
+} from '@infinityxyz/lib/types/core/feed';
 
 // load environment vars
 loadEnv();
@@ -30,38 +35,44 @@ main();
 async function main() {
   const query = db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
-  await configureTwitterApi(query);
+  // await configureTwitterApi(query);
 
   // writes an event to the database
   // the collection address that the event belongs should be found in memory
-  const writer = async (event: BaseFeedEvent) => {
+  const writer = async (event: BaseFeedEvent & { id: string }) => {
     console.log(event);
+
+    let snapshot: FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData> | null = null;
 
     switch (event.type) {
       case FeedEventType.TwitterTweet:
-        const twitterEvent = event as TwitterTweetEvent;
-
-        // find the nft collection ID that belongs to this event
-        const snapshot = await db
+        snapshot = await db
           .collection(firestoreConstants.COLLECTIONS_COLL)
-          .select('id')
-          .where('metadata.links.twitter', '==', Twitter.appendHandle(twitterEvent.username))
+          .select('address')
+          .where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username))
           .limit(1)
           .get();
-
-        if (snapshot.docs.length) {
-          const doc = snapshot.docs[0];
-          await db
-            .collection(firestoreConstants.FEED_COLL)
-            .doc(twitterEvent.id)
-            .set({ collectionAddress: doc.data().address, ...event });
-        } else {
-          console.warn('Twitter event received but not stored in db!');
-        }
         break;
       case FeedEventType.DiscordAnnouncement:
-        // TODO: discord
+        snapshot = await db
+          .collection(firestoreConstants.COLLECTIONS_COLL)
+          .select('address')
+          .where('metadata.integrations.discord.guildId', '==', (event as DiscordEvent).guildId)
+          .limit(1)
+          .get();
         break;
+      default:
+        throw new Error(`Unexpected event '${event.type}'!`);
+    }
+
+    if (snapshot?.docs.length) {
+      const doc = snapshot.docs[0];
+      await db
+        .collection(firestoreConstants.FEED_COLL)
+        .doc(event.id)
+        .set({ collectionAddress: doc.data().address, ...event });
+    } else {
+      console.warn('Event received but not added to the feed!');
     }
   };
 

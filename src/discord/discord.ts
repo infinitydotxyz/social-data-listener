@@ -1,17 +1,17 @@
 import { DiscordConfig } from './config';
-import { Client, Intents } from 'discord.js';
+import { Client, Intents, TextChannel } from 'discord.js';
 import { DiscordIntegration } from '@infinityxyz/lib/types/core';
 import { Routes } from 'discord-api-types/v9';
 import { SlashCommandBuilder, SlashCommandSubcommandBuilder } from '@discordjs/builders';
 import { REST } from '@discordjs/rest';
 import Listener, { OnEvent } from '../listener';
-import { BaseFeedEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
+import { BaseFeedEvent, DiscordAttachment, DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { getDb } from '../database';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
-export class Discord implements Listener<BaseFeedEvent> {
+export class Discord implements Listener<DiscordAnnouncementEvent> {
   private readonly config: DiscordConfig;
 
   constructor(config: DiscordConfig) {
@@ -46,7 +46,7 @@ export class Discord implements Listener<BaseFeedEvent> {
    *
    * Owners of verified collections are able to add this bot to their server.
    */
-  async monitor(handler: OnEvent<BaseFeedEvent>) {
+  async monitor(handler: OnEvent<DiscordAnnouncementEvent>) {
     const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 
     client.once('ready', () => {
@@ -78,11 +78,26 @@ export class Discord implements Listener<BaseFeedEvent> {
         .collection(firestoreConstants.COLLECTIONS_COLL)
         .select('metadata.integrations.discord')
         .where('metadata.integrations.discord.guildId', '==', msg.guildId)
-        .where('metadata.integrations.discord.channels', 'array-contains', msg.channelId)
+        .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
         .get();
       if (integrations.size) {
-        // TODO: create discord event
         handler({
+          id: msg.id,
+          guildId: msg.guildId!,
+          authorId: msg.author.id,
+          author: msg.author.username,
+          content: msg.content,
+          attachments: msg.attachments?.map(
+            (attachment) =>
+              ({
+                url: attachment.url,
+                width: attachment.width,
+                height: attachment.height,
+                contentType: attachment.contentType,
+                description: attachment.description,
+                name: attachment.name
+              } as DiscordAttachment)
+          ),
           type: FeedEventType.DiscordAnnouncement,
           comments: 0,
           likes: 0,
