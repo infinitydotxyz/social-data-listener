@@ -3,3 +3,4 @@ dist
 **/creds/*.json
 .env
 .npmrc
+.env.prod
