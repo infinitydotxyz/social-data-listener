@@ -4,10 +4,10 @@ import { DiscordIntegration } from '@infinityxyz/lib/types/core';
 import { Routes } from 'discord-api-types/v9';
 import { SlashCommandBuilder, SlashCommandSubcommandBuilder } from '@discordjs/builders';
 import { REST } from '@discordjs/rest';
-import Listener, { OnEvent } from '../listener';
-import { BaseFeedEvent, DiscordAttachment, DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
-import { getDb } from '../database';
+import { DiscordAttachment, DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
+import Listener, { OnEvent } from '../listener';
+import { getDb } from '../../database';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
@@ -17,6 +17,8 @@ export class Discord implements Listener<DiscordAnnouncementEvent> {
   constructor(config: DiscordConfig) {
     this.config = config;
   }
+
+  async setup() {}
 
   /**
    * Registers all available 'slash commands'.
@@ -73,8 +75,7 @@ export class Discord implements Listener<DiscordAnnouncementEvent> {
     });
 
     client.on('message', async (msg) => {
-      const db = getDb(); // TODO: DI
-      const integrations = await db
+      const integrations = await getDb()
         .collection(firestoreConstants.COLLECTIONS_COLL)
         .select('metadata.integrations.discord')
         .where('metadata.integrations.discord.guildId', '==', msg.guildId)
