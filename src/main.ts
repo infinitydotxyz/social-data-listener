@@ -50,7 +50,6 @@ async function main() {
           .collection(firestoreConstants.COLLECTIONS_COLL)
           .select('address')
           .where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username))
-          .limit(1)
           .get();
         break;
       case FeedEventType.DiscordAnnouncement:
@@ -58,7 +57,6 @@ async function main() {
           .collection(firestoreConstants.COLLECTIONS_COLL)
           .select('address')
           .where('metadata.integrations.discord.guildId', '==', (event as DiscordEvent).guildId)
-          .limit(1)
           .get();
         break;
       default:
@@ -66,11 +64,12 @@ async function main() {
     }
 
     if (snapshot?.docs.length) {
-      const doc = snapshot.docs[0];
-      await db
-        .collection(firestoreConstants.FEED_COLL)
-        .doc(event.id)
-        .set({ collectionAddress: doc.data().address, ...event });
+      for (const doc of snapshot.docs) {
+        await db
+          .collection(firestoreConstants.FEED_COLL)
+          .doc(event.id)
+          .set({ collectionAddress: doc.data().address, ...event });
+      }
     } else {
       console.warn('Event received but not added to the feed!');
     }
