@@ -1,15 +1,53 @@
 import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { firestoreConstants } from '@infinityxyz/lib/utils';
 import { StreamingV2AddRulesParams, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
 import TwitterConfig, { AccessLevel } from './config';
 import { ruleLengthLimitations, ruleLimitations } from './limitations';
 
-export class Twitter implements Listener<TwitterTweetEvent> {
+export class Twitter extends Listener<TwitterTweetEvent> {
   private api: TwitterApi;
 
-  constructor(options: TwitterConfig) {
+  constructor(options: TwitterConfig, db: FirebaseFirestore.Firestore) {
+    super(db);
     if (!options.bearerToken) throw new Error('Bearer token must be set!');
     this.api = new TwitterApi(options.bearerToken);
+  }
+
+  async setup(): Promise<void> {
+    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+    await this.deleteStreamRules();
+
+    const unsubscribe = query.onSnapshot(async (snapshot) => {
+      const changes = snapshot.docChanges();
+
+      const twitterHandlesAdded = changes
+        .filter((change) => change.type === 'added' && change.doc.data().metadata?.links?.twitter)
+        .map((change) => Twitter.extractHandle(change.doc.data().metadata.links.twitter))
+        .filter((handle) => !!handle.trim());
+
+      // TODO: properly handle 'modified' and 'removed' documents.
+      // The problem is that we can't exactly delete or modify one exact rule because atm one rule monitors multiple accounts.
+      // We might be able to get around this limitation once we can apply many more (and preferably unlimited) rules per twitter handle via some kind of commercial API access.
+      // For the time being, we just inefficiently re-create the rule from scratch whenever a document is deleted or modified (only when twitter url changed).
+      if (
+        changes.some(
+          (change) =>
+            (change.type === 'modified' &&
+              !snapshot.docs.some((old) => old.data().metadata?.links?.twitter === change.doc.data().metadata?.links?.twitter)) ||
+            change.type === 'removed'
+        )
+      ) {
+        console.log(`Resetting twitter streaming API rules (document modified or deleted)`);
+        unsubscribe();
+        return await this.setup();
+      }
+
+      if (twitterHandlesAdded.length) {
+        console.log(`Monitoring ${twitterHandlesAdded.length} new twitter handles`);
+        await this.updateStreamRules(twitterHandlesAdded);
+      }
+    });
   }
 
   /**
