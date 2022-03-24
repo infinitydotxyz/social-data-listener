@@ -1,21 +1,21 @@
 import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import { StreamingV2AddRulesParams, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
-import { getDb } from '../../database';
 import Listener, { OnEvent } from '../listener';
 import TwitterConfig, { AccessLevel } from './config';
 import { ruleLengthLimitations, ruleLimitations } from './limitations';
 
-export class Twitter implements Listener<TwitterTweetEvent> {
+export class Twitter extends Listener<TwitterTweetEvent> {
   private api: TwitterApi;
 
-  constructor(options: TwitterConfig) {
+  constructor(options: TwitterConfig, db: FirebaseFirestore.Firestore) {
+    super(db);
     if (!options.bearerToken) throw new Error('Bearer token must be set!');
     this.api = new TwitterApi(options.bearerToken);
   }
 
   async setup(): Promise<void> {
-    const query = getDb().collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
     await this.deleteStreamRules();
 
     const unsubscribe = query.onSnapshot(async (snapshot) => {

@@ -7,14 +7,14 @@ import { REST } from '@discordjs/rest';
 import { DiscordAttachment, DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import Listener, { OnEvent } from '../listener';
-import { getDb } from '../../database';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
-export class Discord implements Listener<DiscordAnnouncementEvent> {
+export class Discord extends Listener<DiscordAnnouncementEvent> {
   private readonly config: DiscordConfig;
 
-  constructor(config: DiscordConfig) {
+  constructor(config: DiscordConfig, db: FirebaseFirestore.Firestore) {
+    super(db);
     this.config = config;
   }
 
@@ -75,7 +75,7 @@ export class Discord implements Listener<DiscordAnnouncementEvent> {
     });
 
     client.on('message', async (msg) => {
-      const integrations = await getDb()
+      const integrations = await this.db
         .collection(firestoreConstants.COLLECTIONS_COLL)
         .select('metadata.integrations.discord')
         .where('metadata.integrations.discord.guildId', '==', msg.guildId)
