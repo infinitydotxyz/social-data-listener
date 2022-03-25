@@ -1,5 +1,7 @@
+import { getDb } from '../../database';
 import { AccessLevel } from './config';
 import { Twitter } from './twitter';
+import { dbMock } from '../../test/mocks';
 
 test('should convert Twitter URL to handle', () => {
   const url = 'https://www.twitter.com/sleeyax';
@@ -18,7 +20,7 @@ test('should convert handle to URL', () => {
 });
 
 test('should build stream rules from twitter accounts', () => {
-  const twitter = new Twitter({ bearerToken: 'test' });
+  const twitter = new Twitter({ bearerToken: 'test' }, dbMock);
   let accounts = [
     'goatlodge',
     'BattleVerse_io',
