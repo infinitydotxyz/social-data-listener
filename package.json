@@ -16,6 +16,7 @@
   "license": "",
   "devDependencies": {
     "@types/jest": "^27.4.1",
+    "@types/node-schedule": "^1.3.2",
     "dotenv": "^16.0.0",
     "husky": "^7.0.4",
     "jest": "^27.5.1",
@@ -30,10 +31,12 @@
   "dependencies": {
     "@discordjs/builders": "^0.12.0",
     "@discordjs/rest": "^0.3.0",
-    "@infinityxyz/lib": "^1.31.2",
+    "@infinityxyz/lib": "^1.32.4",
     "discord-api-types": "^0.29.0",
     "discord.js": "^13.6.0",
     "firebase-admin": "^10.0.2",
+    "node-schedule": "^2.1.0",
+    "phin": "^3.6.1",
     "twitter-api-v2": "^1.11.0"
   },
   "prettier": {

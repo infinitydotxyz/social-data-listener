@@ -2,8 +2,12 @@ import { BaseFeedEvent } from '@infinityxyz/lib/types/core/feed';
 import { getDb } from '../database';
 import { Discord } from './discord';
 import { Twitter } from './twitter';
+import { CoinMarketCap } from './coinmarketcap';
 
 export type SocialFeedEvent = BaseFeedEvent & { id: string };
+
+export const DEFAULT_USER_AGENT =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.74 Safari/537.36';
 
 /**
  * Starts all registered services asynchronously.
@@ -30,9 +34,18 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
     db
   );
 
+  const coinmarketcap = new CoinMarketCap(
+    {
+      page: 1,
+      size: 20
+    },
+    db
+  );
+
   const services = [
     // twitter,
-    discord
+    discord,
+    coinmarketcap
   ];
 
   for (const service of services) {
