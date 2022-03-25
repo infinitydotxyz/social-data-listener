@@ -10,35 +10,33 @@ import { Twitter } from './services/twitter';
 export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Firestore) {
   console.log(event);
 
-  let snapshot: FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData> | null = null;
-
   switch (event.type) {
     case FeedEventType.TwitterTweet:
-      snapshot = await db
-        .collection(firestoreConstants.COLLECTIONS_COLL)
-        .select('address')
-        .where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username))
-        .get();
-      break;
     case FeedEventType.DiscordAnnouncement:
-      snapshot = await db
-        .collection(firestoreConstants.COLLECTIONS_COLL)
-        .select('address')
-        .where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId)
-        .get();
+      let query = db.collection(firestoreConstants.COLLECTIONS_COLL).select('address');
+
+      if (event.type === FeedEventType.TwitterTweet)
+        query = query.where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username));
+      else query = query.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
+
+      const snapshot = await query.get();
+
+      if (snapshot?.docs.length) {
+        for (const doc of snapshot.docs) {
+          await db
+            .collection(firestoreConstants.FEED_COLL)
+            .doc(event.id)
+            .set({ collectionAddress: doc.data().address, ...event });
+        }
+      } else {
+        console.warn('Event received but not added to the feed!');
+      }
+
+      break;
+    case FeedEventType.CoinMarketCapNews:
+      await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
       break;
     default:
       throw new Error(`Unexpected event '${event.type}'!`);
-  }
-
-  if (snapshot?.docs.length) {
-    for (const doc of snapshot.docs) {
-      await db
-        .collection(firestoreConstants.FEED_COLL)
-        .doc(event.id)
-        .set({ collectionAddress: doc.data().address, ...event });
-    }
-  } else {
-    console.warn('Event received but not added to the feed!');
   }
 }

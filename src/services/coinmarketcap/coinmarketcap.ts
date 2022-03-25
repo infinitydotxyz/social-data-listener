@@ -1,11 +1,14 @@
 import Listener, { OnEvent } from '../listener';
-import { FeedEventType } from '@infinityxyz/lib/types/core/feed';
+import { CoinMarketCapNewsEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { CoinMarketCapConfig } from './config';
-import {} from 'firebase-admin';
 import phin from 'phin';
-import { DEFAULT_USER_AGENT, SocialFeedEvent } from '..';
+import { DEFAULT_USER_AGENT } from '..';
+import { Article } from './models';
+import { ApiResponse } from './dto';
+import { firestoreConstants } from '@infinityxyz/lib/utils';
+import { deduplicate } from './utils';
 
-export class CoinMarketCap extends Listener<SocialFeedEvent> {
+export class CoinMarketCap extends Listener<CoinMarketCapNewsEvent> {
   private readonly url: string;
 
   constructor({ page = 1, size = 20 }: CoinMarketCapConfig, db: FirebaseFirestore.Firestore) {
@@ -15,7 +18,7 @@ export class CoinMarketCap extends Listener<SocialFeedEvent> {
 
   async setup() {}
 
-  async monitor(handler: OnEvent<SocialFeedEvent>) {
+  async monitor(handler: OnEvent<CoinMarketCapNewsEvent>) {
     // TODO: periodically check API and push new events to feed accordingly
     const res = await phin({
       url: this.url,
@@ -35,15 +38,34 @@ export class CoinMarketCap extends Listener<SocialFeedEvent> {
 
     if (res.statusCode === 200) {
       const body = res.body.toString();
-      const json = JSON.parse(body);
-      console.log(json);
-      handler({
-        id: '0',
-        comments: 0,
-        likes: 0,
-        timestamp: Date.now(),
-        type: FeedEventType.NftOffer // TODO: change this!
-      });
+      const json: ApiResponse<Article> = JSON.parse(body);
+      let newsItems = json.data.filter((item) => item.meta.visibility ?? true);
+
+      // Check for duplicates and modify the array of news items to add accordingly.
+      const latestNewsItem = await this.db
+        .collection(firestoreConstants.FEED_COLL)
+        .select('id')
+        .where('type', '==', FeedEventType.CoinMarketCapNews)
+        .orderBy('releasedAt', 'desc')
+        .limit(1)
+        .get();
+      if (latestNewsItem.docs.length) {
+        const doc = latestNewsItem.docs[0];
+        const slug = doc.data().id;
+        newsItems = deduplicate(newsItems, { slug });
+      }
+
+      for (const newsItem of newsItems) {
+        handler({
+          ...newsItem.meta,
+          id: newsItem.slug,
+          comments: 0,
+          likes: 0,
+          timestamp: Date.now(),
+          type: FeedEventType.CoinMarketCapNews,
+          createdAtCMC: newsItem.createdAt
+        });
+      }
     } else {
       console.warn(`Invalid status code received from CoinMarketCap!`, res.statusCode, res.body.toString());
     }
