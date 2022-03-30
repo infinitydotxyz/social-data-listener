@@ -1,4 +1,4 @@
-import { AccessLevel } from './config';
+import { AccessLevel } from './access-level';
 
 /**
  * Tiwtter API access limitations.

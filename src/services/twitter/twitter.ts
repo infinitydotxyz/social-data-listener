@@ -1,51 +1,68 @@
 import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
-import { firestoreConstants } from '@infinityxyz/lib/utils';
-import { StreamingV2AddRulesParams, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
+import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
+import {
+  ApiResponseError,
+  IClientSettings,
+  StreamingV2AddRulesParams,
+  TweetV2SingleStreamResult,
+  TwitterApi
+} from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
-import TwitterConfig, { AccessLevel } from './config';
+import { AccessLevel } from './access-level';
 import { ruleLengthLimitations, ruleLimitations } from './limitations';
+
+export type TwitterOptions = {
+  accessToken: string;
+  refreshToken: string;
+  listId: string;
+  clientId: string;
+  clientSecret: string;
+};
 
 export class Twitter extends Listener<TwitterTweetEvent> {
   private api: TwitterApi;
+  private options: TwitterOptions;
 
-  constructor(options: TwitterConfig, db: FirebaseFirestore.Firestore) {
+  constructor(options: TwitterOptions, db: FirebaseFirestore.Firestore) {
     super(db);
-    if (!options.bearerToken) throw new Error('Bearer token must be set!');
-    this.api = new TwitterApi(options.bearerToken);
+    this.options = options;
+    this.api = new TwitterApi(options.accessToken);
   }
 
   async setup(): Promise<void> {
-    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
-    await this.deleteStreamRules();
+    // TODO: support multiple list ids -> should probably store the list id that a collection belongs to in db for easier list member management
+    const listId = this.options.listId;
 
-    const unsubscribe = query.onSnapshot(async (snapshot) => {
+    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+
+    query.onSnapshot(async (snapshot) => {
       const changes = snapshot.docChanges();
 
-      const twitterHandlesAdded = changes
-        .filter((change) => change.type === 'added' && change.doc.data().metadata?.links?.twitter)
-        .map((change) => Twitter.extractHandle(change.doc.data().metadata.links.twitter))
-        .filter((handle) => !!handle.trim());
+      for (const change of changes) {
+        // skip collections w/o twitter url
+        const url = change.doc.data().metadata?.links?.twitter;
+        if (!url) continue;
 
-      // TODO: properly handle 'modified' and 'removed' documents.
-      // The problem is that we can't exactly delete or modify one exact rule because atm one rule monitors multiple accounts.
-      // We might be able to get around this limitation once we can apply many more (and preferably unlimited) rules per twitter handle via some kind of commercial API access.
-      // For the time being, we just inefficiently re-create the rule from scratch whenever a document is deleted or modified (only when twitter url changed).
-      if (
-        changes.some(
-          (change) =>
-            (change.type === 'modified' &&
-              !snapshot.docs.some((old) => old.data().metadata?.links?.twitter === change.doc.data().metadata?.links?.twitter)) ||
-            change.type === 'removed'
-        )
-      ) {
-        console.log(`Resetting twitter streaming API rules (document modified or deleted)`);
-        unsubscribe();
-        return await this.setup();
-      }
+        // skip invalid handles
+        const handle = Twitter.extractHandle(url).trim();
+        if (!handle) continue;
 
-      if (twitterHandlesAdded.length) {
-        console.log(`Monitoring ${twitterHandlesAdded.length} new twitter handles`);
-        await this.updateStreamRules(twitterHandlesAdded);
+        const user = await this.autoRetry(() => this.api.v2.userByUsername(handle));
+        if (user.data) {
+          const userId = user.data.id;
+
+          switch (change.type) {
+            case 'added':
+            case 'modified': // TODO: delete old account from the list when the twitter link is modified?
+              await this.autoRetry(() => this.api.v2.addListMember(listId, userId));
+              break;
+            case 'removed':
+              await this.autoRetry(() => this.api.v2.removeListMember(listId, userId));
+              break;
+          }
+
+          console.log(`${change.type} ${user.data.name}`);
+        }
       }
     });
   }
@@ -66,6 +83,44 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   /**
+   * Automatically retries the request on rate limit. Also refreshes auth tokens automatically.
+   */
+  async autoRetry<T>(callback: () => T | Promise<T>) {
+    while (true) {
+      try {
+        return await callback();
+      } catch (error) {
+        if (error instanceof ApiResponseError) {
+          // retry on rate limit
+          if (error.rateLimitError && error.rateLimit) {
+            const resetTimeout = error.rateLimit.reset * 1000; // convert to ms time instead of seconds time
+            const timeToWait = resetTimeout - Date.now();
+            console.log(`Rate limit hit! Waiting ${timeToWait} ms...`);
+            await sleep(timeToWait);
+          }
+          // retry when oauth tokens are expired
+          else if (error.code === 401) {
+            console.log('Tokens expired');
+            // create a new client because for some reason mixing clientId with bearerToken from `this.Api` (accessToken) doesn't work properly (odd TS error)
+            const client = new TwitterApi({
+              clientId: this.options.clientId,
+              clientSecret: this.options.clientSecret
+            });
+            const { accessToken, refreshToken } = await client.refreshOAuth2Token(this.options.refreshToken);
+            console.log('new tokens success', accessToken, refreshToken);
+            this.api = new TwitterApi(accessToken);
+            this.options.accessToken = accessToken;
+            if (refreshToken) this.options.refreshToken = refreshToken;
+          }
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Fetches all configured stream rule ids.
    */
   async getStreamRuleIds() {
@@ -78,7 +133,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
    * Fetches all configured stream rules.
    */
   async getStreamRules() {
-    const res = await this.api.v2.streamRules();
+    const res = await this.autoRetry(() => this.api.v2.streamRules());
     return res.data ?? [];
   }
 
@@ -143,7 +198,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
    */
   async updateStreamRules(accounts: string[]) {
     const rules = this.buildStreamRules(accounts);
-    const res = await this.api.v2.updateStreamRules(rules);
+    const res = await this.autoRetry(() => this.api.v2.updateStreamRules(rules));
     if (res.errors?.length) {
       console.error(res.errors);
       throw new Error('Failed to update stream rules. See the API error above.');
@@ -161,11 +216,13 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
     if (ids.length == 0) return;
 
-    const res = await this.api.v2.updateStreamRules({
-      delete: {
-        ids
-      }
-    });
+    const res = await this.autoRetry(() =>
+      this.api.v2.updateStreamRules({
+        delete: {
+          ids
+        }
+      })
+    );
 
     return res.meta;
   }
@@ -174,21 +231,35 @@ export class Twitter extends Listener<TwitterTweetEvent> {
    * Starts listening to a stream of tweets from all twitter users we have set in {@link updateStreamRules}.
    */
   private async streamTweets(onTweet: (tweet: TweetV2SingleStreamResult) => void) {
-    const stream = await this.api.v2.searchStream({
-      autoConnect: true,
-      expansions: 'author_id,attachments.media_keys',
-      'tweet.fields': 'author_id,created_at,id,lang,possibly_sensitive,source,text',
-      'user.fields': 'location,name,profile_image_url,username,verified',
-      'media.fields': 'height,width,preview_image_url,type,url,alt_text'
-    });
+    const stream = await this.autoRetry(() =>
+      this.api.v2.searchStream({
+        autoConnect: true,
+        expansions: 'author_id,attachments.media_keys',
+        'tweet.fields': 'author_id,created_at,id,lang,possibly_sensitive,source,text',
+        'user.fields': 'location,name,profile_image_url,username,verified',
+        'media.fields': 'height,width,preview_image_url,type,url,alt_text'
+      })
+    );
 
     for await (const item of stream) {
       onTweet(item);
     }
   }
 
+  /**
+   * Watch the list on twitter for new tweets.
+   */
+  private async watchList() {
+    /* while (true) {
+      console.log('watching watchlist');
+      await sleep(1000);
+    } */
+    // TODO: watch lists (see: https://developer.twitter.com/en/docs/twitter-api/lists/list-tweets/introduction)
+  }
+
   monitor(handler: OnEvent<TwitterTweetEvent>): void {
-    this.streamTweets((tweet) => {
+    this.watchList();
+    /* this.streamTweets((tweet) => {
       const media = tweet.includes?.media?.[0];
       const user = tweet.includes?.users?.[0];
 
@@ -206,6 +277,6 @@ export class Twitter extends Listener<TwitterTweetEvent> {
         text: tweet.data.text ?? '',
         username: user?.username ?? ''
       });
-    });
+    }); */
   }
 }

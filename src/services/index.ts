@@ -17,11 +17,11 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
 
   const twitter = new Twitter(
     {
-      apiKey: process.env.TWITTER_API_KEY!,
-      apiKeySecret: process.env.TWITTER_API_KEY_SECRET!,
-      bearerToken: process.env.TWITTER_BEARER_TOKEN,
-      accessToken: process.env.TWITTER_ACCESS_TOKEN,
-      accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
+      accessToken: process.env.TWITTER_OAUTH_ACCESS_TOKEN!,
+      refreshToken: process.env.TWITTER_OAUTH_REFRESH_TOKEN!,
+      listId: process.env.TWITTER_LIST_ID!,
+      clientId: process.env.TWITTER_CLIENT_ID!,
+      clientSecret: process.env.TWITTER_CLIENT_SECRET!
     },
     db
   );
@@ -43,9 +43,9 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
   );
 
   const services = [
-    // twitter,
-    discord,
-    coinmarketcap
+    twitter
+    // discord,
+    // coinmarketcap
   ];
 
   for (const service of services) {
