@@ -6,19 +6,14 @@ import firebaseAdmin from 'firebase-admin';
 
 export class TwitterList {
   private _setupMutex = false;
-  private get listRef(): FirebaseFirestore.DocumentReference<BotAccountListConfig> {
-    return this._botAccount.accountRef
-      .collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL)
-      .doc(this._config.id) as any;
+
+  constructor(private _config: BotAccountListConfig, private _botAccount: BotAccount, private _db: FirebaseFirestore.Firestore) {
+    this.setup();
   }
 
-  private get _allListMembersRef() {
-    return this._db
-      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
-      .doc(socialDataFirestoreConstants.TWITTER_DOC)
-      .collection('listMembers');
-  }
-
+  /**
+   * returns the number of members in the list
+   */
   public get size() {
     return this._config.numMembers;
   }
@@ -27,10 +22,9 @@ export class TwitterList {
     return `${collection.chainId}-${trimLowerCase(collection.address)}`;
   }
 
-  constructor(private _config: BotAccountListConfig, private _botAccount: BotAccount, private _db: FirebaseFirestore.Firestore) {
-    this.setup();
-  }
-
+  /**
+   * handle adding a collection to the list
+   */
   public async onCollectionAddUsername(username: string, collection: Collection) {
     if (this._config.numMembers + 1 > this._botAccount.twitterListenerConfig.maxAccountsPerList) {
       throw new Error('List is full');
@@ -51,6 +45,9 @@ export class TwitterList {
     });
   }
 
+  /**
+   * handle deleting a collection from the list
+   */
   public async onCollectionRemoveUsername(username: string, collection: Collection) {
     const member = await this.getListMember(username);
 
@@ -65,6 +62,22 @@ export class TwitterList {
     }
   }
 
+  private get listRef(): FirebaseFirestore.DocumentReference<BotAccountListConfig> {
+    return this._botAccount.accountRef
+      .collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL)
+      .doc(this._config.id) as any;
+  }
+
+  private get _allListMembersRef() {
+    return this._db
+      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+      .doc(socialDataFirestoreConstants.TWITTER_DOC)
+      .collection(socialDataFirestoreConstants.TWITTER_LIST_MEMBERS_COLL);
+  }
+
+  /**
+   * remove a member from the twitter list
+   */
   private async removeMember(member: ListMember) {
     const response = await this._botAccount.client.v2.removeListMember(member.listId, member.userId);
     const successful = response.data.is_member === false;
@@ -79,6 +92,9 @@ export class TwitterList {
     }
   }
 
+  /**
+   * add member to the twitter list
+   */
   private async addMember(username: string): Promise<ListMember> {
     const listId = this._config.id;
     const member = await this.getListMember(username);
@@ -109,6 +125,11 @@ export class TwitterList {
     return member;
   }
 
+  /**
+   * get a list member object by username
+   *
+   * initializes the member if it doesn't exist
+   */
   private async getListMember(username: string): Promise<ListMember> {
     const userSnap = await this._allListMembersRef.where('username', '==', username).get();
     const existingUser = userSnap?.docs?.[0]?.data();
@@ -133,6 +154,9 @@ export class TwitterList {
     return newUser;
   }
 
+  /**
+   * setup the list to stay in sync with the database
+   */
   private setup() {
     this.checkMutex();
     this.listenForConfigChanges();

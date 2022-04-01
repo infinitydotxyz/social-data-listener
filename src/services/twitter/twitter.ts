@@ -1,19 +1,8 @@
 import { SlashCommandSubcommandBuilder } from '@discordjs/builders';
 import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
-import {
-  ApiResponseError,
-  IClientSettings,
-  StreamingV2AddRulesParams,
-  TweetV2SingleStreamResult,
-  TwitterApi
-} from 'twitter-api-v2';
-import { socialDataFirestoreConstants } from '../../constants';
+import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
-import { AccessLevel } from './access-level';
-import { BotAccount } from './bot-account';
-import { ruleLengthLimitations, ruleLimitations } from './limitations';
-import { BotAccountConfig, TwitterListenerConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -34,72 +23,47 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   async setup(): Promise<void> {
-    // TODO: support multiple list ids -> should probably store the list id that a collection belongs to in db for easier list member management
+    // this._config = (await this.configRef.get()).data() as TwitterListenerConfig;
+    // this.listenForConfigChanges();
 
-    const twitterListenerConfig = (
-      await this.db
-        .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
-        .doc(socialDataFirestoreConstants.TWITTER_DOC)
-        .get()
-    ).data() as TwitterListenerConfig;
-    console.log(twitterListenerConfig);
-    const botAccountConfigs = await this.getBotAccountConfigs();
+    // const botAccounts = await this.getBotAccounts();
+    // this._botAccounts = botAccounts;
 
-    console.log(botAccountConfigs);
+    // this._setupMutex = true;
 
-    const botAccounts = botAccountConfigs.map(
-      (botAccountConfig) => new BotAccount(twitterListenerConfig, botAccountConfig, this.db)
-    );
+    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
-    // try {
-    //   botAccounts[0].createList('test');
-    // } catch (err) {
-    //   console.error(err);
-    // }
+    query.onSnapshot(async (snapshot) => {
+      const changes = snapshot.docChanges();
 
-    // const listId = this.options.listId;
+      for (const change of changes) {
+        // skip collections w/o twitter url
+        const url = change.doc.data().metadata?.links?.twitter;
+        if (!url) continue;
 
-    // const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+        // skip invalid handles
+        const handle = Twitter.extractHandle(url).trim();
+        if (!handle) continue;
 
-    // query.onSnapshot(async (snapshot) => {
-    //   const changes = snapshot.docChanges();
+        // const user = await this.autoRetry(() => this.api.v2.userByUsername(handle));
+        // if (user.data) {
+        //   const userId = user.data.id;
 
-    //   for (const change of changes) {
-    //     // skip collections w/o twitter url
-    //     const url = change.doc.data().metadata?.links?.twitter;
-    //     if (!url) continue;
+        switch (change.type) {
+          case 'added':
+          case 'modified': // TODO: delete old account from the list when the twitter link is modified?
+            // await this.autoRetry(() => this.api.v2.addListMember(listId, userId));
 
-    //     // skip invalid handles
-    //     const handle = Twitter.extractHandle(url).trim();
-    //     if (!handle) continue;
+            break;
+          case 'removed':
+            // await this.autoRetry(() => this.api.v2.removeListMember(listId, userId));
+            break;
+        }
 
-    //     const user = await this.autoRetry(() => this.api.v2.userByUsername(handle));
-    //     if (user.data) {
-    //       const userId = user.data.id;
-
-    //       switch (change.type) {
-    //         case 'added':
-    //         case 'modified': // TODO: delete old account from the list when the twitter link is modified?
-    //           await this.autoRetry(() => this.api.v2.addListMember(listId, userId));
-    //           break;
-    //         case 'removed':
-    //           await this.autoRetry(() => this.api.v2.removeListMember(listId, userId));
-    //           break;
-    //       }
-
-    //       console.log(`${change.type} ${user.data.name}`);
-    //     }
-    //   }
-    // });
-  }
-
-  async getBotAccountConfigs(): Promise<BotAccountConfig[]> {
-    const accountsCollection = this.db
-      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
-      .doc(socialDataFirestoreConstants.TWITTER_DOC)
-      .collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL);
-    const accounts = await accountsCollection.get();
-    return accounts.docs.map((doc) => doc.data()) as BotAccountConfig[];
+        //   console.log(`${change.type} ${user.data.name}`);
+        // }
+      }
+    });
   }
 
   /**
@@ -153,113 +117,6 @@ export class Twitter extends Listener<TwitterTweetEvent> {
         throw error;
       }
     }
-  }
-
-  /**
-   * Fetches all configured stream rule ids.
-   */
-  async getStreamRuleIds() {
-    const rules = await this.getStreamRules();
-    const ids = rules.map((rule) => rule.id);
-    return ids;
-  }
-
-  /**
-   * Fetches all configured stream rules.
-   */
-  async getStreamRules() {
-    const res = await this.autoRetry(() => this.api.v2.streamRules());
-    return res.data ?? [];
-  }
-
-  /**
-   * Dynamically build efficient stream rules by keeping in mind Twitter's API limits.
-   *
-   * Example resulting rule: `(from:sleeyax OR from:jfrazier) -is:retweet -is:reply -is:quote`
-   */
-  buildStreamRules(
-    accounts: string[],
-    accessLevel: AccessLevel = AccessLevel.Essential,
-    filter: string = '-is:retweet -is:reply -is:quote'
-  ): StreamingV2AddRulesParams {
-    // TODO: check if there's a more performant (but also readable) way to do this...
-
-    const placeholder = `()${filter.length ? ' ' + filter : ''}`;
-    const concatenator = ' OR ';
-    const rules: Array<{ value: string }> = [];
-    const maxRules = ruleLimitations[accessLevel];
-    const maxRuleLength = ruleLengthLimitations[accessLevel];
-
-    let offset = 0;
-    let fromAccounts = accounts.map((account) => 'from:' + account);
-    for (let i = 1; i <= fromAccounts.length; i++) {
-      const slice = fromAccounts.slice(offset, i);
-      const current = slice.join(concatenator);
-
-      if (placeholder.length + current.length > maxRuleLength) {
-        // set offset to index of the last item in the current slice.
-        // this will make sure that, on the next iteration of the loop, we start with the item that we're now excluding.
-        offset = slice.length - 1;
-        // push the joined slice w/o the last item (which would exceed the max rule length otherwise) to the rules array
-        const previous = slice.slice(0, offset).join(concatenator);
-        rules.push({ value: placeholder.replace('()', `(${previous})`) });
-      }
-    }
-
-    // push any remaining rules
-    if (offset < fromAccounts.length)
-      rules.push({ value: placeholder.replace('()', `(${fromAccounts.slice(offset, fromAccounts.length).join(concatenator)})`) });
-
-    if (rules.length > maxRules) {
-      console.warn(
-        `Max number of stream rules reached (${rules.length}/${maxRules}). Rules that exceed this limit will be stripped to avoid API errors!`
-      );
-      return {
-        add: rules.slice(0, maxRules)
-      };
-    }
-
-    return {
-      add: rules
-    };
-  }
-
-  /**
-   * Set the twiter handles to watch for tweets.
-   *
-   * Please beware of rate limits! See link.
-   *
-   * @link https://developer.twitter.com/en/docs/twitter-api/tweets/filtered-stream/introduction
-   */
-  async updateStreamRules(accounts: string[]) {
-    const rules = this.buildStreamRules(accounts);
-    const res = await this.autoRetry(() => this.api.v2.updateStreamRules(rules));
-    if (res.errors?.length) {
-      console.error(res.errors);
-      throw new Error('Failed to update stream rules. See the API error above.');
-    }
-    return res.data;
-  }
-
-  /**
-   * Remove all saved stream rules.
-   *
-   * The stream will become empty until we add accounts again.
-   */
-  async deleteStreamRules() {
-    const ids = await this.getStreamRuleIds();
-
-    if (ids.length == 0) return;
-
-    const res = await this.autoRetry(() =>
-      this.api.v2.updateStreamRules({
-        delete: {
-          ids
-        }
-      })
-    );
-
-    return res.meta;
   }
 
   /**

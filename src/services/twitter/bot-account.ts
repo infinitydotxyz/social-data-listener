@@ -10,10 +10,24 @@ import {
   TwitterListenerConfig,
   UserIdResponseData
 } from './twitter.types';
+import firebaseAdmin from 'firebase-admin';
 
 export class BotAccount {
   private _client: TwitterApi;
   private _setupMutex = false;
+
+  constructor(
+    private _twitterListenerConfig: TwitterListenerConfig,
+    private _accountConfig: BotAccountConfig,
+    private _db: FirebaseFirestore.Firestore
+  ) {
+    this._client = new TwitterApi({
+      clientId: this._accountConfig.clientId,
+      clientSecret: this._accountConfig.clientSecret
+    });
+
+    this.setup();
+  }
 
   public get client() {
     return this._client;
@@ -32,45 +46,21 @@ export class BotAccount {
     return accountRef;
   }
 
-  private get _tokenValid(): boolean {
-    if (!this._accountConfig.refreshTokenValidUntil || typeof this._accountConfig.refreshTokenValidUntil !== 'number') {
-      return false;
-    }
-
-    return this._accountConfig.refreshTokenValidUntil > Date.now() + 5 * 60 * 1000; // 5 minutes from now
-  }
-
   get numLists() {
     return this._accountConfig.numLists;
   }
 
-  constructor(
-    public twitterListenerConfig: TwitterListenerConfig,
-    private _accountConfig: BotAccountConfig,
-    private _db: FirebaseFirestore.Firestore
-  ) {
-    this._client = new TwitterApi({
-      clientId: this._accountConfig.clientId,
-      clientSecret: this._accountConfig.clientSecret
-    });
-
-    this.setup();
+  public get twitterListenerConfig(): TwitterListenerConfig {
+    return this._twitterListenerConfig;
   }
 
-  private checkMutex() {
-    if (this._setupMutex) {
-      throw new Error('This method is not allowed to be called after setup()');
-    }
-    return;
+  public set twitterListenerConfig(config: TwitterListenerConfig) {
+    this._twitterListenerConfig = config;
   }
 
-  private setup() {
-    this.checkMutex();
-    this.keepTokenFresh();
-    this.listenForConfigChanges();
-    this._setupMutex = true;
-  }
-
+  /**
+   * get a user object from twitter via a username
+   */
   public async getUser(username: string): Promise<UserIdResponseData> {
     const response = await phin({
       method: 'GET',
@@ -89,28 +79,13 @@ export class BotAccount {
     return res.data;
   }
 
-  public async getUserIds(usernames: string[]): Promise<UserIdResponseData[]> {
-    const response = await phin({
-      method: 'GET',
-      url: 'https://api.twitter.com/2/users/by',
-      headers: {
-        Authorization: `Bearer ${this._accountConfig.accessToken}`
-      },
-      data: {
-        usernames: usernames.join(',')
-      }
-    });
-
-    const buffer = response.body;
-    const res: BasicResponse<UserIdResponseData[]> = JSON.parse(buffer.toString());
-    const data = res.data;
-    if (response.statusCode !== 200 || !Array.isArray(data)) {
-      throw new Error(`Failed to get user ids. Status Code: ${response.statusCode}`);
-    }
-
-    return data;
-  }
-
+  /**
+   * create a list for the bot account to manage
+   *
+   * 1. create a list using the twitter api
+   * 2. store list data in firestore
+   * 3. increment the number of lists for the bot config
+   */
   public async createList(name: string): Promise<TwitterList> {
     let listConfig: BotAccountListConfig = {} as any;
     await this._db.runTransaction(async (tx) => {
@@ -120,7 +95,7 @@ export class BotAccount {
         throw new Error('This account has reached the max number of lists');
       }
 
-      const { id } = await this.postCreateList(name);
+      const { id } = await this.createTwitterList(name);
 
       const listRef = this.accountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(id);
 
@@ -130,22 +105,44 @@ export class BotAccount {
         numMembers: 0
       };
 
-      const updatedConfig: BotAccountConfig = {
-        ...this._accountConfig,
-        numLists: config.numLists + 1
-      };
-
       tx.set(listRef, listConfig);
-      tx.set(this.accountRef, updatedConfig);
+      tx.update(this.accountRef, { numLists: firebaseAdmin.firestore.FieldValue.increment(1) });
     });
+
     if (!listConfig?.id) {
       throw new Error('Failed to create list');
     }
+
     const list = new TwitterList(listConfig, this, this._db);
     return list;
   }
 
-  private async postCreateList(name: string) {
+  private get _tokenValid(): boolean {
+    if (!this._accountConfig.refreshTokenValidUntil || typeof this._accountConfig.refreshTokenValidUntil !== 'number') {
+      return false;
+    }
+
+    return this._accountConfig.refreshTokenValidUntil > Date.now() + 5 * 60 * 1000; // 5 minutes from now
+  }
+
+  private setup() {
+    this.checkMutex();
+    this.keepTokenFresh();
+    this.listenForConfigChanges();
+    this._setupMutex = true;
+  }
+
+  private checkMutex() {
+    if (this._setupMutex) {
+      throw new Error('This method is not allowed to be called after setup()');
+    }
+    return;
+  }
+
+  /**
+   * create a list via the twitter api
+   */
+  private async createTwitterList(name: string) {
     const response = await phin({
       method: 'POST',
       url: 'https://api.twitter.com/2/lists',
