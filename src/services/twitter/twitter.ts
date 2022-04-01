@@ -1,3 +1,4 @@
+import { SlashCommandSubcommandBuilder } from '@discordjs/builders';
 import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
 import {
@@ -7,9 +8,12 @@ import {
   TweetV2SingleStreamResult,
   TwitterApi
 } from 'twitter-api-v2';
+import { socialDataFirestoreConstants } from '../../constants';
 import Listener, { OnEvent } from '../listener';
 import { AccessLevel } from './access-level';
+import { BotAccount } from './bot-account';
 import { ruleLengthLimitations, ruleLimitations } from './limitations';
+import { BotAccountConfig, TwitterListenerConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -31,40 +35,71 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
   async setup(): Promise<void> {
     // TODO: support multiple list ids -> should probably store the list id that a collection belongs to in db for easier list member management
-    const listId = this.options.listId;
 
-    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+    const twitterListenerConfig = (
+      await this.db
+        .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+        .doc(socialDataFirestoreConstants.TWITTER_DOC)
+        .get()
+    ).data() as TwitterListenerConfig;
+    console.log(twitterListenerConfig);
+    const botAccountConfigs = await this.getBotAccountConfigs();
 
-    query.onSnapshot(async (snapshot) => {
-      const changes = snapshot.docChanges();
+    console.log(botAccountConfigs);
 
-      for (const change of changes) {
-        // skip collections w/o twitter url
-        const url = change.doc.data().metadata?.links?.twitter;
-        if (!url) continue;
+    const botAccounts = botAccountConfigs.map(
+      (botAccountConfig) => new BotAccount(twitterListenerConfig, botAccountConfig, this.db)
+    );
 
-        // skip invalid handles
-        const handle = Twitter.extractHandle(url).trim();
-        if (!handle) continue;
+    try {
+      botAccounts[0].createList('test');
+    } catch (err) {
+      console.error(err);
+    }
 
-        const user = await this.autoRetry(() => this.api.v2.userByUsername(handle));
-        if (user.data) {
-          const userId = user.data.id;
+    // const listId = this.options.listId;
 
-          switch (change.type) {
-            case 'added':
-            case 'modified': // TODO: delete old account from the list when the twitter link is modified?
-              await this.autoRetry(() => this.api.v2.addListMember(listId, userId));
-              break;
-            case 'removed':
-              await this.autoRetry(() => this.api.v2.removeListMember(listId, userId));
-              break;
-          }
+    // const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
-          console.log(`${change.type} ${user.data.name}`);
-        }
-      }
-    });
+    // query.onSnapshot(async (snapshot) => {
+    //   const changes = snapshot.docChanges();
+
+    //   for (const change of changes) {
+    //     // skip collections w/o twitter url
+    //     const url = change.doc.data().metadata?.links?.twitter;
+    //     if (!url) continue;
+
+    //     // skip invalid handles
+    //     const handle = Twitter.extractHandle(url).trim();
+    //     if (!handle) continue;
+
+    //     const user = await this.autoRetry(() => this.api.v2.userByUsername(handle));
+    //     if (user.data) {
+    //       const userId = user.data.id;
+
+    //       switch (change.type) {
+    //         case 'added':
+    //         case 'modified': // TODO: delete old account from the list when the twitter link is modified?
+    //           await this.autoRetry(() => this.api.v2.addListMember(listId, userId));
+    //           break;
+    //         case 'removed':
+    //           await this.autoRetry(() => this.api.v2.removeListMember(listId, userId));
+    //           break;
+    //       }
+
+    //       console.log(`${change.type} ${user.data.name}`);
+    //     }
+    //   }
+    // });
+  }
+
+  async getBotAccountConfigs(): Promise<BotAccountConfig[]> {
+    const accountsCollection = this.db
+      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+      .doc(socialDataFirestoreConstants.TWITTER_DOC)
+      .collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL);
+    const accounts = await accountsCollection.get();
+    return accounts.docs.map((doc) => doc.data()) as BotAccountConfig[];
   }
 
   /**

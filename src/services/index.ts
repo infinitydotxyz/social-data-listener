@@ -3,6 +3,7 @@ import { getDb } from '../database';
 import { Discord } from './discord';
 import { Twitter } from './twitter';
 import { CoinMarketCap } from './coinmarketcap';
+import Listener from './listener';
 
 export type SocialFeedEvent = BaseFeedEvent & { id: string };
 
@@ -42,7 +43,7 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
     db
   );
 
-  const services = [
+  const services: Listener<any>[] = [
     twitter
     // discord,
     // coinmarketcap

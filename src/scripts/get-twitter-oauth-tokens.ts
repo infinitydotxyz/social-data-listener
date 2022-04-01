@@ -34,7 +34,7 @@ app.get('/callback', async (req, res) => {
   // verify
   if (!codeVerifier || !sessionState || !state || !code)
     return res.status(400).send('You denied the app or your session expired!');
-  if (state !== sessionState) return res.status(400).send('Stored tokens didnt match!');
+  if (state !== sessionState) return res.status(400).send("Stored tokens didn't match!");
 
   try {
     const { accessToken, refreshToken, expiresIn } = await client.loginWithOAuth2({
