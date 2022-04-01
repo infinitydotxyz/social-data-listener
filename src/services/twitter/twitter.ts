@@ -51,11 +51,11 @@ export class Twitter extends Listener<TwitterTweetEvent> {
       (botAccountConfig) => new BotAccount(twitterListenerConfig, botAccountConfig, this.db)
     );
 
-    try {
-      botAccounts[0].createList('test');
-    } catch (err) {
-      console.error(err);
-    }
+    // try {
+    //   botAccounts[0].createList('test');
+    // } catch (err) {
+    //   console.error(err);
+    // }
 
     // const listId = this.options.listId;
 

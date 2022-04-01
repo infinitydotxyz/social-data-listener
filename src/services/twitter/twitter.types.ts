@@ -27,7 +27,7 @@ export interface BotAccountConfig {
   numLists: number;
 }
 
-export interface BotAccountList {
+export interface BotAccountListConfig {
   id: string;
   name: string;
   numMembers: number;
@@ -38,6 +38,29 @@ export interface CreateListResponseData {
   name: string;
 }
 
+export interface UserIdResponseData {
+  id: string;
+  username: string;
+  name: string;
+}
+
 export interface BasicResponse<T> {
   data: T;
+}
+
+export interface Collection {
+  chainId: string;
+  address: string;
+}
+
+export interface ListMemberCollection extends Collection {
+  addedAt: number;
+}
+
+export interface ListMember {
+  userId: string;
+  username: string;
+  listId: string;
+  listOwnerId: string;
+  collections: Record<string, ListMemberCollection>;
 }
