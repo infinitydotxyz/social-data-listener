@@ -4,7 +4,7 @@ import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
 import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
 import { BotAccountManager } from './bot-account-manager';
-import { TwitterConfig } from './twitter.config';
+import { defaultTwitterConfig, TwitterConfig } from './twitter-config';
 import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
@@ -32,9 +32,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   async setup(): Promise<void> {
-    const initConfig = (await TwitterConfig.ref.get()).data() as ITwitterConfig;
-    const twitterConfig = new TwitterConfig(initConfig);
-
+    const twitterConfig = await this.getTwitterConfig();
     const botAccountManager = new BotAccountManager(twitterConfig);
 
     const bayc = {
@@ -74,6 +72,17 @@ export class Twitter extends Listener<TwitterTweetEvent> {
         }
       }
     });
+  }
+
+  private async getTwitterConfig() {
+    let initConfig = (await TwitterConfig.ref.get()).data() as ITwitterConfig;
+    if (!initConfig) {
+      await TwitterConfig.ref.set(defaultTwitterConfig);
+      initConfig = defaultTwitterConfig;
+    }
+
+    const twitterConfig = new TwitterConfig(initConfig);
+    return twitterConfig;
   }
 
   /**

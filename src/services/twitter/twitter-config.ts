@@ -3,6 +3,11 @@ import { firestore } from '../../container';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
+export const defaultTwitterConfig: ITwitterConfig = {
+  maxListsPerAccount: 5,
+  maxMembersPerList: 1000
+};
+
 export class TwitterConfig extends ConfigListener<ITwitterConfig> {
   static get ref() {
     return firestore

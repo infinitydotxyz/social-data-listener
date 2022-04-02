@@ -11,9 +11,13 @@ export interface TwitterConfig {
 }
 
 export interface BotAccountConfig {
-  apiKey: string;
-  apiKeySecret: string;
-  bearerToken: string;
+  /**
+   * TODO are these needed for monitoring tweets?
+   * if so, make sure to adjust the validate method of BotAccount
+   */
+  // apiKey: string;
+  // apiKeySecret: string;
+  // bearerToken: string;
   clientId: string;
   clientSecret: string;
   username: string;
