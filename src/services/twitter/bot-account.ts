@@ -6,7 +6,7 @@ import { BasicResponse, BotAccountConfig, CreateListResponseData, ListConfig, Us
 import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
-import { TwitterConfig } from './twitter.config';
+import { TwitterConfig } from './twitter-config';
 
 export class BotAccount extends ConfigListener<BotAccountConfig> {
   static ref(botAccountUsername: string) {

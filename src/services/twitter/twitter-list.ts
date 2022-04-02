@@ -5,7 +5,7 @@ import { trimLowerCase } from '@infinityxyz/lib/utils';
 import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
-import { TwitterConfig } from './twitter.config';
+import { TwitterConfig } from './twitter-config';
 
 export class TwitterList extends ConfigListener<ListConfig> {
   static ref(botAccount: BotAccount, listId: string): FirebaseFirestore.DocumentReference<ListConfig> {

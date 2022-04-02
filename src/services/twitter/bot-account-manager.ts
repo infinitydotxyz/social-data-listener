@@ -3,7 +3,7 @@ import { BotAccount } from './bot-account';
 import { BotAccountConfig, Collection, ListMember } from './twitter.types';
 
 import { TwitterList } from './twitter-list';
-import { TwitterConfig } from './twitter.config';
+import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
 import chalk from 'chalk';
 import { v4 } from 'uuid';
