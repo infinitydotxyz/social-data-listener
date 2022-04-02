@@ -1,11 +1,9 @@
 import { AccessLevel } from './access-level';
 
 /**
- * Tiwtter API access limitations.
+ * Twitter API access limitations.
  */
-export type Limitations = {
-  [accessLevel: number]: number;
-};
+export type Limitations = Record<AccessLevel, number>;
 
 /**
  * X rules per stream.
