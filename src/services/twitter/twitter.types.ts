@@ -1,4 +1,4 @@
-export interface TwitterListenerConfig {
+export interface TwitterConfig {
   /**
    * the number of lists that each bot account can have
    */
@@ -7,7 +7,7 @@ export interface TwitterListenerConfig {
   /**
    * the max number of accounts that can be members of a list
    */
-  maxAccountsPerList: number;
+  maxMembersPerList: number;
 }
 
 export interface BotAccountConfig {
@@ -27,7 +27,7 @@ export interface BotAccountConfig {
   numLists: number;
 }
 
-export interface BotAccountListConfig {
+export interface ListConfig {
   id: string;
   name: string;
   numMembers: number;

@@ -1,15 +1,16 @@
 import DocListener from './doc-listener.abstract';
 
 export abstract class ConfigListener<T> extends DocListener<T> {
-  protected _config: T;
+  private _config: T;
 
-  protected _isReady: Promise<void>;
+  public get config(): T {
+    return this._config;
+  }
 
-  constructor(docRef: FirebaseFirestore.DocumentReference<T>) {
+  constructor(initialValue: T, docRef: FirebaseFirestore.DocumentReference<T>) {
     super(docRef);
-    this._config = {} as T;
-
-    this._isReady = this._registerListener();
+    this._config = initialValue;
+    this._registerListener();
     this._listen();
   }
 

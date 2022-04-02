@@ -3,6 +3,8 @@ import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/fe
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
 import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
+import { TwitterConfig } from './twitter.config';
+import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -23,7 +25,9 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   async setup(): Promise<void> {
-    // this._config = (await this.configRef.get()).data() as TwitterListenerConfig;
+    const initConfig = (await TwitterConfig.ref.get()).data() as ITwitterConfig;
+    const twitterConfig = new TwitterConfig(initConfig);
+
     // this.listenForConfigChanges();
 
     // const botAccounts = await this.getBotAccounts();

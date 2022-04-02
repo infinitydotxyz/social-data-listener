@@ -2,60 +2,31 @@ import phin from 'phin';
 import { TwitterApi } from 'twitter-api-v2';
 import { socialDataFirestoreConstants } from '../../constants';
 import { TwitterList } from './twitter-list';
-import {
-  BasicResponse,
-  BotAccountConfig,
-  BotAccountListConfig,
-  CreateListResponseData,
-  TwitterListenerConfig,
-  UserIdResponseData
-} from './twitter.types';
+import { BasicResponse, BotAccountConfig, CreateListResponseData, ListConfig, UserIdResponseData } from './twitter.types';
 import firebaseAdmin from 'firebase-admin';
+import { ConfigListener } from '../../models/config-listener.abstract';
+import { firestore } from '../../container';
+import { TwitterConfig } from './twitter.config';
 
-export class BotAccount {
-  private _client: TwitterApi;
-  private _setupMutex = false;
-
-  constructor(
-    private _twitterListenerConfig: TwitterListenerConfig,
-    private _accountConfig: BotAccountConfig,
-    private _db: FirebaseFirestore.Firestore
-  ) {
-    this._client = new TwitterApi({
-      clientId: this._accountConfig.clientId,
-      clientSecret: this._accountConfig.clientSecret
-    });
-
-    this.setup();
-  }
-
-  public get client() {
-    return this._client;
-  }
-
-  get botAccountId() {
-    return this._accountConfig.username;
-  }
-
-  get accountRef(): FirebaseFirestore.DocumentReference<BotAccountConfig> {
-    const accountRef = this._db
+export class BotAccount extends ConfigListener<BotAccountConfig> {
+  static ref(botAccountUsername: string) {
+    const accountRef = firestore
       .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
       .doc(socialDataFirestoreConstants.TWITTER_DOC)
       .collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL)
-      .doc(this._accountConfig.username) as any;
+      .doc(botAccountUsername) as FirebaseFirestore.DocumentReference<BotAccountConfig>;
     return accountRef;
   }
 
-  get numLists() {
-    return this._accountConfig.numLists;
+  get authHeaders() {
+    return {
+      Authorization: `Bearer ${this.config.accessToken}`
+    };
   }
 
-  public get twitterListenerConfig(): TwitterListenerConfig {
-    return this._twitterListenerConfig;
-  }
-
-  public set twitterListenerConfig(config: TwitterListenerConfig) {
-    this._twitterListenerConfig = config;
+  constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig) {
+    super(accountConfig, BotAccount.ref(accountConfig.username));
+    this.keepTokenFresh();
   }
 
   /**
@@ -66,7 +37,7 @@ export class BotAccount {
       method: 'GET',
       url: `https://api.twitter.com/2/users/by/username/${username}`,
       headers: {
-        Authorization: `Bearer ${this._accountConfig.accessToken}`
+        ...this.authHeaders
       }
     });
     const buffer = response.body;
@@ -80,11 +51,11 @@ export class BotAccount {
   }
 
   public async getLists(): Promise<TwitterList[]> {
-    const listConfigsSnapshot = await this.accountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).get();
-    const listConfigs = listConfigsSnapshot.docs.map((item) => item.data()) as BotAccountListConfig[];
+    const listConfigsSnapshot = await this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).get();
+    const listConfigs = listConfigsSnapshot.docs.map((item) => item.data()) as ListConfig[];
 
     const lists: TwitterList[] = listConfigs.map((listConfig) => {
-      const list = new TwitterList(listConfig, this, this._db);
+      const list = new TwitterList(listConfig, this, this._twitterConfig);
       return list;
     });
 
@@ -99,56 +70,42 @@ export class BotAccount {
    * 3. increment the number of lists for the bot config
    */
   public async createList(name: string): Promise<TwitterList> {
-    let listConfig: BotAccountListConfig = {} as any;
-    await this._db.runTransaction(async (tx) => {
-      const config = (await tx.get(this.accountRef)).data() as BotAccountConfig;
+    let listConfig: ListConfig = {} as any;
+    await firestore.runTransaction(async (tx) => {
+      const config = (await tx.get(this._docRef)).data() as BotAccountConfig;
 
-      if (config.numLists + 1 > this.twitterListenerConfig.maxAccountsPerList) {
+      if (config.numLists + 1 > this._twitterConfig.config.maxListsPerAccount) {
         throw new Error('This account has reached the max number of lists');
       }
 
       const { id } = await this.createTwitterList(name);
 
-      const listRef = this.accountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(id);
+      const listRef = this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(id);
 
-      const listConfig: BotAccountListConfig = {
+      const listConfig: ListConfig = {
         id: id,
         name: name,
         numMembers: 0
       };
 
       tx.set(listRef, listConfig);
-      tx.update(this.accountRef, { numLists: firebaseAdmin.firestore.FieldValue.increment(1) });
+      tx.update(this._docRef, { numLists: firebaseAdmin.firestore.FieldValue.increment(1) });
     });
 
     if (!listConfig?.id) {
       throw new Error('Failed to create list');
     }
 
-    const list = new TwitterList(listConfig, this, this._db);
+    const list = new TwitterList(listConfig, this, this._twitterConfig);
     return list;
   }
 
   private get _tokenValid(): boolean {
-    if (!this._accountConfig.refreshTokenValidUntil || typeof this._accountConfig.refreshTokenValidUntil !== 'number') {
+    if (!this.config.refreshTokenValidUntil || typeof this.config.refreshTokenValidUntil !== 'number') {
       return false;
     }
 
-    return this._accountConfig.refreshTokenValidUntil > Date.now() + 5 * 60 * 1000; // 5 minutes from now
-  }
-
-  private setup() {
-    this.checkMutex();
-    this.keepTokenFresh();
-    this.listenForConfigChanges();
-    this._setupMutex = true;
-  }
-
-  private checkMutex() {
-    if (this._setupMutex) {
-      throw new Error('This method is not allowed to be called after setup()');
-    }
-    return;
+    return this.config.refreshTokenValidUntil > Date.now() + 5 * 60 * 1000; // 5 minutes from now
   }
 
   /**
@@ -159,7 +116,7 @@ export class BotAccount {
       method: 'POST',
       url: 'https://api.twitter.com/2/lists',
       headers: {
-        Authorization: `Bearer ${this._accountConfig.accessToken}`
+        ...this.authHeaders
       },
       data: {
         name
@@ -180,8 +137,52 @@ export class BotAccount {
     };
   }
 
+  async removeListMember(listId: string, memberId: string): Promise<{ isUserMember: boolean }> {
+    const response = await phin({
+      method: 'DELETE',
+      url: `https://api.twitter.com/2/lists/${listId}/members/${memberId}`,
+      headers: {
+        ...this.authHeaders
+      }
+    });
+
+    console.log(response.statusCode); // TODO what is this status code?
+    const buffer = response.body;
+    const res: BasicResponse<{ is_member: boolean }> = JSON.parse(buffer.toString());
+    const data = res.data;
+
+    const isUserMember = data?.is_member;
+
+    return {
+      isUserMember
+    };
+  }
+
+  async addListMember(listId: string, memberId: string): Promise<{ isUserMember: boolean }> {
+    const response = await phin({
+      method: 'POST',
+      url: `https://api.twitter.com/2/lists/${listId}/members`,
+      headers: {
+        ...this.authHeaders
+      },
+      data: {
+        user_id: memberId
+      }
+    });
+
+    console.log(response.statusCode); // TODO what is this status code?
+    const buffer = response.body;
+    const res: BasicResponse<{ is_member: boolean }> = JSON.parse(buffer.toString());
+    const data = res.data;
+
+    const isUserMember = data?.is_member;
+
+    return {
+      isUserMember
+    };
+  }
+
   private keepTokenFresh() {
-    this.checkMutex();
     const refresh = async () => {
       try {
         await this.refreshToken();
@@ -197,32 +198,26 @@ export class BotAccount {
     });
   }
 
-  private listenForConfigChanges() {
-    this.checkMutex();
-    this.accountRef.onSnapshot((snapshot) => {
-      const data = snapshot.data() as BotAccountConfig;
-      this._accountConfig = data;
-    });
-  }
-
   private async refreshToken(force?: boolean): Promise<void> {
     if (this._tokenValid && !force) {
       return;
     }
 
-    const { accessToken, refreshToken, expiresIn } = await this._client.refreshOAuth2Token(this._accountConfig.refreshToken);
+    const client = new TwitterApi({
+      clientId: this.config.clientId,
+      clientSecret: this.config.clientSecret
+    });
+
+    const { accessToken, refreshToken, expiresIn } = await client.refreshOAuth2Token(this.config.refreshToken);
 
     if (!refreshToken) {
       throw new Error('failed to get refresh token');
     }
 
-    const updatedConfig: BotAccountConfig = {
-      ...this._accountConfig,
-      accessToken,
-      refreshToken,
-      refreshTokenValidUntil: Date.now() + expiresIn * 1000
-    };
+    const expiresInMs = expiresIn * 1000;
 
-    await this.accountRef.update(updatedConfig);
+    const refreshTokenValidUntil = Date.now() + expiresInMs;
+
+    await this._docRef.update({ accessToken, refreshToken, refreshTokenValidUntil });
   }
 }
