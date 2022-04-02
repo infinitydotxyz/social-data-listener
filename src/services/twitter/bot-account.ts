@@ -18,15 +18,48 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     return accountRef;
   }
 
+  static validateConfig(config: BotAccountConfig): boolean {
+    const canRefresh = !!config.clientId && !!config.clientSecret;
+    const oAuthReady = !!config.accessToken && !!config.refreshToken;
+
+    return canRefresh && oAuthReady;
+  }
+
+  private _lists: Map<string, TwitterList> = new Map();
+
+  public getListsMembers() {
+    let sum = 0;
+    for (const [, list] of this._lists) {
+      sum += list.size;
+    }
+    return sum;
+  }
+
+  public getListWithMinMembers() {
+    let minList: TwitterList | undefined;
+    for (const [, list] of this._lists) {
+      if (!minList || list.size < minList.size) {
+        minList = list;
+      }
+    }
+    return minList;
+  }
+
+  public getListById(id: string): TwitterList | undefined {
+    return this._lists.get(id);
+  }
+
   get authHeaders() {
     return {
       Authorization: `Bearer ${this.config.accessToken}`
     };
   }
 
+  public isReady: Promise<void>;
   constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig) {
     super(accountConfig, BotAccount.ref(accountConfig.username));
     this.keepTokenFresh();
+    this.isReady = this.initLists();
   }
 
   /**
@@ -50,16 +83,34 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     return res.data;
   }
 
-  public async getLists(): Promise<TwitterList[]> {
-    const listConfigsSnapshot = await this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).get();
-    const listConfigs = listConfigsSnapshot.docs.map((item) => item.data()) as ListConfig[];
+  private listsInitialized = false;
+  private async initLists(): Promise<void> {
+    if (this.listsInitialized) {
+      return;
+    }
+    this.listsInitialized = true;
+    let resolved = false;
+    return new Promise((resolve) => {
+      this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).onSnapshot((listConfigsSnapshot) => {
+        if (!resolved) {
+          resolve();
+          resolved = true;
+        }
 
-    const lists: TwitterList[] = listConfigs.map((listConfig) => {
-      const list = new TwitterList(listConfig, this, this._twitterConfig);
-      return list;
+        const changes = listConfigsSnapshot.docChanges();
+        for (const change of changes) {
+          if (change.type === 'added') {
+            console.log('List added', change.doc.id);
+            const listConfig = change.doc.data() as ListConfig;
+            const list = new TwitterList(listConfig, this, this._twitterConfig);
+            this._lists.set(listConfig.id, list);
+          } else if (change.type === 'removed') {
+            console.log('List removed', change.doc.id);
+            this._lists.delete(change.doc.id);
+          }
+        }
+      });
     });
-
-    return lists;
   }
 
   /**

@@ -44,10 +44,6 @@ export class TwitterList extends ConfigListener<ListConfig> {
    * handle adding a collection to the list
    */
   public async onCollectionAddUsername(username: string, collection: Collection) {
-    if (this.config.numMembers + 1 > this._twitterConfig.config.maxMembersPerList) {
-      throw new Error('List is full');
-    }
-
     const member = await this.addMember(username);
 
     // add collection to user
@@ -69,12 +65,18 @@ export class TwitterList extends ConfigListener<ListConfig> {
   public async onCollectionRemoveUsername(username: string, collection: Collection) {
     const member = await this.getListMember(username);
 
+    if (member.listId !== this.config.id || member.listOwnerId !== this._botAccount.config.username) {
+      throw new Error('Attempted to remove user from list that is not part of this list');
+    }
+
     const key = this.getCollectionKey(collection);
     if (member.collections[key]) {
       delete member.collections[key];
     }
+    const collectionSubscribedToAccount = Object.keys(member.collections);
+    const noCollectionSubscribed = collectionSubscribedToAccount.length === 0;
 
-    if (Object.keys(member.collections).length === 0) {
+    if (noCollectionSubscribed) {
       // remove user from list
       await this.removeMember(member);
     }
@@ -105,9 +107,15 @@ export class TwitterList extends ConfigListener<ListConfig> {
     const listId = this.config.id;
     const member = await this.getListMember(username);
 
-    if (member.listId && member.listOwnerId) {
-      // user is already part of a list
+    if (member.listId === this.config.id && member.listOwnerId === this._botAccount.config.username) {
+      // user is already part of this list
       return member;
+    } else if (member.listId && member.listOwnerId) {
+      throw new Error('Attempted to add user to list that is already part of another list');
+    }
+
+    if (this.config.numMembers + 1 > this._twitterConfig.config.maxMembersPerList) {
+      throw new Error('List is full');
     }
 
     const { isUserMember } = await this._botAccount.addListMember(listId, member.userId);

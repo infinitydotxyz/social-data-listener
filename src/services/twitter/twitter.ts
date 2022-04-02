@@ -55,7 +55,8 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
         switch (change.type) {
           case 'added':
-          case 'modified': // TODO: delete old account from the list when the twitter link is modified?
+          case 'modified':
+            // TODO: delete old account from the list when the twitter link is modified? => background task that pull collections a purges unused accounts
             // await this.autoRetry(() => this.api.v2.addListMember(listId, userId));
 
             break;
