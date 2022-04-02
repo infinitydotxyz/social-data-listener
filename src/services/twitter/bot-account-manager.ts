@@ -1,13 +1,20 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { BotAccount } from './bot-account';
 import { BotAccountConfig, TwitterListenerConfig } from './twitter.types';
+import EventEmitter from 'events';
+import { getSupportInfo } from 'prettier';
+import { TwitterList } from './twitter-list';
 
-export class BotAccountManager {
+export class BotAccountManager extends EventEmitter {
   private _setupMutex = false;
 
   private _config: TwitterListenerConfig;
 
   private _botAccounts: BotAccount[] = [];
+
+  private _lists: TwitterList[] = [];
+
+  private _setupPromise: Promise<void>;
 
   private get configRef(): FirebaseFirestore.DocumentReference<TwitterListenerConfig> {
     return this._db
@@ -16,12 +23,40 @@ export class BotAccountManager {
   }
 
   constructor(private _db: FirebaseFirestore.Firestore) {
+    super();
     this._config = {} as any;
+
+    this._setupPromise = this.setup();
+  }
+
+  private getNextList() {
+    let list = this._lists.shift();
+    if (!list) {
+      throw new Error('No more lists');
+    }
+
+    // round robin selection
+    while (list!.size >= this._config.maxAccountsPerList) {
+      this._lists.push(list);
+      list = this._lists.shift();
+      if (!list) {
+        throw new Error('No more lists');
+      }
+    }
+
+    return list;
   }
 
   private async setup() {
+    this.checkMutex();
+    this._setupMutex = true;
     this._config = (await this.configRef.get()).data() as TwitterListenerConfig;
     this.listenForConfigChanges();
+    this._botAccounts = await this.initializeBotAccounts();
+
+    const accountLists = await Promise.all(this._botAccounts.map((account) => account.getLists()));
+
+    this._lists = accountLists.flatMap((lists) => lists);
   }
 
   private checkMutex() {
@@ -36,16 +71,13 @@ export class BotAccountManager {
     this.configRef.onSnapshot((snapshot) => {
       const data = snapshot.data() as TwitterListenerConfig;
       this._config = data;
-      this._botAccounts.forEach((botAccount) => {
-        botAccount.twitterListenerConfig = this._config; // update configs
-      });
+      this.emit('configChange', this._config);
     });
   }
 
-  private async getBotAccounts(): Promise<BotAccount[]> {
+  private async initializeBotAccounts(): Promise<BotAccount[]> {
     const botAccountConfigs = await this.getBotAccountConfigs();
     const botAccounts = botAccountConfigs.map((botAccountConfig) => new BotAccount(this._config, botAccountConfig, this._db));
-
     return botAccounts;
   }
 

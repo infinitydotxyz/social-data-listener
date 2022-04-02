@@ -79,6 +79,18 @@ export class BotAccount {
     return res.data;
   }
 
+  public async getLists(): Promise<TwitterList[]> {
+    const listConfigsSnapshot = await this.accountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).get();
+    const listConfigs = listConfigsSnapshot.docs.map((item) => item.data()) as BotAccountListConfig[];
+
+    const lists: TwitterList[] = listConfigs.map((listConfig) => {
+      const list = new TwitterList(listConfig, this, this._db);
+      return list;
+    });
+
+    return lists;
+  }
+
   /**
    * create a list for the bot account to manage
    *
@@ -211,6 +223,6 @@ export class BotAccount {
       refreshTokenValidUntil: Date.now() + expiresIn * 1000
     };
 
-    await this.accountRef.set(updatedConfig);
+    await this.accountRef.update(updatedConfig);
   }
 }
