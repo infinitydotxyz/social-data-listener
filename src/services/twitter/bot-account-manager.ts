@@ -20,7 +20,7 @@ export class BotAccountManager {
     return v4().substring(0, 20);
   }
 
-  public async addUserToList(username: string, collection: Collection) {
+  public async subscribeCollectionToUser(username: string, collection: Collection) {
     await this.isReady;
     try {
       const user = await this.getUser(username);
@@ -51,7 +51,7 @@ export class BotAccountManager {
     }
   }
 
-  public async removeUserFromList(username: string, collection: Collection) {
+  public async unsubscribeCollectionFromUser(username: string, collection: Collection) {
     await this.isReady;
     try {
       const user = await this.getUser(username);

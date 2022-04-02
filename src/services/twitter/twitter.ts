@@ -40,10 +40,10 @@ export class Twitter extends Listener<TwitterTweetEvent> {
       chainId: '1'
     };
 
-    await botAccountManager.addUserToList('jfrazier_eth', bayc);
-    await botAccountManager.addUserToList('jfrazier_eth', bayc);
-    await botAccountManager.removeUserFromList('jfrazier_eth', bayc);
-    await botAccountManager.addUserToList('jfrazier_eth', bayc);
+    await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
+    await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
 
     const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
@@ -64,7 +64,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           case 'added':
           case 'modified':
             // TODO: delete old account from the list when the twitter link is modified?
-            // botAccountManager.addUserToList(handle, { chainId: collectionData.chainId, address: collectionData.address });
+            // botAccountManager.subscribeCollectionToUser(handle, { chainId: collectionData.chainId, address: collectionData.address });
             break;
           case 'removed':
             // botAccountManager.removeUserFromList(handle, { chainId: collectionData.chainId, address: collectionData.address });
