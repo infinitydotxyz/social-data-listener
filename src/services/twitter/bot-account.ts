@@ -19,10 +19,11 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   }
 
   static validateConfig(config: BotAccountConfig): boolean {
+    const hasUsername = !!config.username;
     const canRefresh = !!config.clientId && !!config.clientSecret;
     const oAuthReady = !!config.accessToken && !!config.refreshToken;
 
-    return canRefresh && oAuthReady;
+    return hasUsername && canRefresh && oAuthReady;
   }
 
   private _lists: Map<string, TwitterList> = new Map();
@@ -92,11 +93,6 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     let resolved = false;
     return new Promise((resolve) => {
       this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).onSnapshot((listConfigsSnapshot) => {
-        if (!resolved) {
-          resolve();
-          resolved = true;
-        }
-
         const changes = listConfigsSnapshot.docChanges();
         for (const change of changes) {
           if (change.type === 'added') {
@@ -107,7 +103,13 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
           } else if (change.type === 'removed') {
             console.log('List removed', change.doc.id);
             this._lists.delete(change.doc.id);
+            this._docRef.update({ numLists: firebaseAdmin.firestore.FieldValue.increment(-1) });
           }
+        }
+
+        if (!resolved) {
+          resolve();
+          resolved = true;
         }
       });
     });
@@ -133,7 +135,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
 
       const listRef = this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(id);
 
-      const listConfig: ListConfig = {
+      listConfig = {
         id: id,
         name: name,
         numMembers: 0
@@ -197,7 +199,10 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
       }
     });
 
-    console.log(response.statusCode); // TODO what is this status code?
+    if (response.statusCode !== 200) {
+      throw new Error(`failed to remove member: ${memberId} from list: ${listId}. Status Code: ${response.statusCode}`);
+    }
+
     const buffer = response.body;
     const res: BasicResponse<{ is_member: boolean }> = JSON.parse(buffer.toString());
     const data = res.data;
@@ -221,7 +226,10 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
       }
     });
 
-    console.log(response.statusCode); // TODO what is this status code?
+    if (response.statusCode !== 200) {
+      throw new Error(`failed to remove member: ${memberId} from list: ${listId}. Status Code: ${response.statusCode}`);
+    }
+
     const buffer = response.body;
     const res: BasicResponse<{ is_member: boolean }> = JSON.parse(buffer.toString());
     const data = res.data;

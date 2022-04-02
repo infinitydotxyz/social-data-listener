@@ -5,6 +5,14 @@ import { BotAccountConfig, Collection, ListMember } from './twitter.types';
 import { TwitterList } from './twitter-list';
 import { TwitterConfig } from './twitter.config';
 import { firestore } from '../../container';
+import chalk from 'chalk';
+import { v4 } from 'uuid';
+
+/**
+ * TODO validate that we don't have extra/missing members/collections
+ * TODO monitor list tweets and save to db
+ * TODO handle errors and rate limits
+ */
 
 export class BotAccountManager {
   private _botAccounts: Map<string, BotAccount> = new Map();
@@ -14,29 +22,33 @@ export class BotAccountManager {
     this.isReady = this.initBotAccounts();
   }
 
-  private getListByIds(botAccountId: string, listId: string) {
-    const botAccount = this._botAccounts.get(botAccountId);
-    const list = botAccount?.getListById(listId);
-    return list;
+  private getNewListName() {
+    return v4().substring(0, 20);
   }
 
   public async addUserToList(username: string, collection: Collection) {
     await this.isReady;
     try {
       const user = await this.getUser(username);
+
       let list: TwitterList | undefined;
+      let botAccount: BotAccount | undefined;
 
       if (user.listId && user.listOwnerId) {
-        list = this.getListByIds(user.listOwnerId, user.listId);
+        const res = this.getListByIds(user.listOwnerId, user.listId);
+        botAccount = res.botAccount;
+        list = res.list;
       }
 
       if (!list) {
-        const botAccount = this.getBotAccountWithMinMembers();
+        botAccount = this.getBotAccountWithMinMembers();
         list = botAccount?.getListWithMinMembers();
       }
 
-      if (!list) {
-        throw new Error('No list found');
+      if (!botAccount) {
+        throw new Error('No bot account found');
+      } else if (!list || list.size > this.twitterConfig.config.maxMembersPerList) {
+        list = await botAccount.createList(this.getNewListName());
       }
 
       await list.onCollectionAddUsername(username, collection);
@@ -55,7 +67,8 @@ export class BotAccountManager {
         const ref = TwitterList.getMemberRef(username);
         await ref.delete();
       } else {
-        list = this.getListByIds(user.listOwnerId, user.listId);
+        const res = this.getListByIds(user.listOwnerId, user.listId);
+        list = res.list;
 
         if (!list) {
           throw new Error('List not found');
@@ -81,6 +94,15 @@ export class BotAccountManager {
     return minBotAccount;
   }
 
+  private getListByIds(
+    botAccountId: string,
+    listId: string
+  ): { botAccount: BotAccount | undefined; list: TwitterList | undefined } {
+    const botAccount = this._botAccounts.get(botAccountId);
+    const list = botAccount?.getListById(listId);
+    return { botAccount, list };
+  }
+
   private async getUser(username: string): Promise<Partial<ListMember>> {
     const userSnap = await TwitterList.allMembersRef.where('username', '==', username).get();
     const existingUser = userSnap?.docs?.[0]?.data();
@@ -101,22 +123,19 @@ export class BotAccountManager {
     }
     this.botAccountsInitialized = true;
     let resolved = false;
+    console.log(chalk.blue('Loading bot accounts...'));
     return new Promise((resolve) => {
       firestore
         .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
         .doc(socialDataFirestoreConstants.TWITTER_DOC)
         .collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL)
-        .onSnapshot((accountsSnapshot) => {
+        .onSnapshot(async (accountsSnapshot) => {
           const addBotAccount = (accountConfig: BotAccountConfig) => {
             const isValidConfig = BotAccount.validateConfig(accountConfig);
             if (isValidConfig) {
               console.log('Bot account added', accountConfig.username);
               const botAccount = new BotAccount(accountConfig, this.twitterConfig);
               this._botAccounts.set(accountConfig.username, botAccount);
-              if (!resolved) {
-                resolve(); // resolve once we have added at least one bot account
-                resolved = true;
-              }
             }
           };
 
@@ -135,6 +154,15 @@ export class BotAccountManager {
                 addBotAccount(accountConfig);
               }
             }
+          }
+
+          if (!resolved && this._botAccounts.size > 0) {
+            for (const [, botAccount] of this._botAccounts) {
+              await botAccount.isReady;
+            }
+            console.log(chalk.green(`Loaded: ${this._botAccounts.size} bot accounts`));
+            resolve(); // resolve once we have added at least one bot account
+            resolved = true;
           }
         });
     });

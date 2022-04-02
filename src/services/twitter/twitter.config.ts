@@ -1,10 +1,8 @@
-import { singleton } from 'tsyringe';
 import { socialDataFirestoreConstants } from '../../constants';
 import { firestore } from '../../container';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
-@singleton()
 export class TwitterConfig extends ConfigListener<ITwitterConfig> {
   static get ref() {
     return firestore

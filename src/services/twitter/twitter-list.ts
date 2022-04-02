@@ -146,8 +146,8 @@ export class TwitterList extends ConfigListener<ListConfig> {
    */
   private async getListMember(username: string): Promise<ListMember> {
     const userSnap = await TwitterList.allMembersRef.where('username', '==', username).get();
-    const existingUser = userSnap?.docs?.[0]?.data();
-    if (existingUser?.id) {
+    const existingUser = userSnap?.docs?.[0]?.data() as ListMember | undefined;
+    if (existingUser?.username) {
       return existingUser as ListMember;
     }
 

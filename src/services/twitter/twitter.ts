@@ -3,8 +3,9 @@ import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/fe
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
 import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
+import { BotAccountManager } from './bot-account-manager';
 import { TwitterConfig } from './twitter.config';
-import { TwitterConfig as ITwitterConfig } from './twitter.types';
+import { Collection, TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -28,12 +29,16 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     const initConfig = (await TwitterConfig.ref.get()).data() as ITwitterConfig;
     const twitterConfig = new TwitterConfig(initConfig);
 
-    // this.listenForConfigChanges();
+    const botAccountManager = new BotAccountManager(twitterConfig);
 
-    // const botAccounts = await this.getBotAccounts();
-    // this._botAccounts = botAccounts;
-
-    // this._setupMutex = true;
+    const bayc: Collection = {
+      address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
+      chainId: '1'
+    };
+    await botAccountManager.addUserToList('jfrazier_eth', bayc);
+    await botAccountManager.addUserToList('jfrazier_eth', bayc);
+    await botAccountManager.removeUserFromList('jfrazier_eth', bayc);
+    await botAccountManager.addUserToList('jfrazier_eth', bayc);
 
     const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
