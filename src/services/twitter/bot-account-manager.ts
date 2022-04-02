@@ -8,12 +8,6 @@ import { firestore } from '../../container';
 import chalk from 'chalk';
 import { v4 } from 'uuid';
 
-/**
- * TODO validate that we don't have extra/missing members/collections
- * TODO monitor list tweets and save to db
- * TODO handle errors and rate limits
- */
-
 export class BotAccountManager {
   private _botAccounts: Map<string, BotAccount> = new Map();
 

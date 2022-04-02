@@ -1,11 +1,11 @@
-import { SlashCommandSubcommandBuilder } from '@discordjs/builders';
-import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { Collection } from '@infinityxyz/lib/types/core/Collection';
+import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
 import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
 import { BotAccountManager } from './bot-account-manager';
 import { TwitterConfig } from './twitter.config';
-import { Collection, TwitterConfig as ITwitterConfig } from './twitter.types';
+import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -14,6 +14,12 @@ export type TwitterOptions = {
   clientId: string;
   clientSecret: string;
 };
+
+/**
+ * TODO validate that we don't have extra/missing members/collections
+ * TODO monitor list tweets and save to db
+ * TODO handle errors and rate limits
+ */
 
 export class Twitter extends Listener<TwitterTweetEvent> {
   private api: TwitterApi;
@@ -31,10 +37,11 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
     const botAccountManager = new BotAccountManager(twitterConfig);
 
-    const bayc: Collection = {
+    const bayc = {
       address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
       chainId: '1'
     };
+
     await botAccountManager.addUserToList('jfrazier_eth', bayc);
     await botAccountManager.addUserToList('jfrazier_eth', bayc);
     await botAccountManager.removeUserFromList('jfrazier_eth', bayc);
@@ -47,31 +54,24 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
       for (const change of changes) {
         // skip collections w/o twitter url
-        const url = change.doc.data().metadata?.links?.twitter;
-        if (!url) continue;
+        const collectionData = change.doc.data() as Partial<Collection>;
+        const url = collectionData.metadata?.links?.twitter;
+        if (!url || !collectionData.address || !collectionData.chainId) continue;
 
         // skip invalid handles
         const handle = Twitter.extractHandle(url).trim();
         if (!handle) continue;
 
-        // const user = await this.autoRetry(() => this.api.v2.userByUsername(handle));
-        // if (user.data) {
-        //   const userId = user.data.id;
-
         switch (change.type) {
           case 'added':
           case 'modified':
-            // TODO: delete old account from the list when the twitter link is modified? => background task that pull collections a purges unused accounts
-            // await this.autoRetry(() => this.api.v2.addListMember(listId, userId));
-
+            // TODO: delete old account from the list when the twitter link is modified?
+            botAccountManager.addUserToList(handle, { chainId: collectionData.chainId, address: collectionData.address });
             break;
           case 'removed':
-            // await this.autoRetry(() => this.api.v2.removeListMember(listId, userId));
+            botAccountManager.removeUserFromList(handle, { chainId: collectionData.chainId, address: collectionData.address });
             break;
         }
-
-        //   console.log(`${change.type} ${user.data.name}`);
-        // }
       }
     });
   }
