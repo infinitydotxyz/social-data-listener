@@ -19,6 +19,7 @@ export type TwitterOptions = {
  * TODO validate that we don't have extra/missing members/collections
  * TODO monitor list tweets and save to db
  * TODO handle errors and rate limits
+ * TODO think about what happens if a username changes but user id stays the same
  */
 
 export class Twitter extends Listener<TwitterTweetEvent> {
