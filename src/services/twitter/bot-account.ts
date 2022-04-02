@@ -77,6 +77,12 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     const buffer = response.body;
     const res: BasicResponse<UserIdResponseData> = JSON.parse(buffer.toString());
 
+    if (response.statusCode === 429) {
+      const retryAfter = parseInt(response.headers['x-rate-limit-reset'] as string, 10) * 1000;
+      const retryIn = retryAfter - Date.now();
+      throw new Error(`Rate limited for: ${Math.floor(retryIn / 1000)}s`);
+    }
+
     if (response.statusCode !== 200) {
       throw new Error(`Failed to get user id: ${JSON.stringify(res, null, 2)}`);
     }
@@ -227,7 +233,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     });
 
     if (response.statusCode !== 200) {
-      throw new Error(`failed to remove member: ${memberId} from list: ${listId}. Status Code: ${response.statusCode}`);
+      throw new Error(`failed to add member: ${memberId} to list: ${listId}. Status Code: ${response.statusCode}`);
     }
 
     const buffer = response.body;

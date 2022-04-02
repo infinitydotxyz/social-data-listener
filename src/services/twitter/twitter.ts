@@ -64,10 +64,10 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           case 'added':
           case 'modified':
             // TODO: delete old account from the list when the twitter link is modified?
-            botAccountManager.addUserToList(handle, { chainId: collectionData.chainId, address: collectionData.address });
+            // botAccountManager.addUserToList(handle, { chainId: collectionData.chainId, address: collectionData.address });
             break;
           case 'removed':
-            botAccountManager.removeUserFromList(handle, { chainId: collectionData.chainId, address: collectionData.address });
+            // botAccountManager.removeUserFromList(handle, { chainId: collectionData.chainId, address: collectionData.address });
             break;
         }
       }
