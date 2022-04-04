@@ -37,7 +37,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
   }
 
   public getCollectionKey(collection: Collection) {
-    return `${collection.chainId}-${trimLowerCase(collection.address)}`;
+    return `${collection.chainId}:${trimLowerCase(collection.address)}`;
   }
 
   /**
@@ -86,7 +86,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
    * remove a member from the twitter list
    */
   private async removeMember(member: ListMember) {
-    const { isUserMember } = await this._botAccount.removeListMember(member.listId, member.userId);
+    const { isUserMember } = await this._botAccount.client.removeListMember(member.listId, member.userId);
 
     if (isUserMember) {
       throw new Error(`Failed to remove user: ${member.userId} from list: ${member.listId}`);
@@ -118,7 +118,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
       throw new Error('List is full');
     }
 
-    const { isUserMember } = await this._botAccount.addListMember(listId, member.userId);
+    const { isUserMember } = await this._botAccount.client.addListMember(listId, member.userId);
 
     if (!isUserMember) {
       throw new Error(`Failed to add user: ${member.userId} to list: ${listId}`);
@@ -151,7 +151,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
       return existingUser as ListMember;
     }
 
-    const response = await this._botAccount.getUser(username);
+    const response = await this._botAccount.client.getUser(username);
 
     if (!response.id) {
       throw new Error('Failed to get user id');

@@ -68,7 +68,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
             // botAccountManager.subscribeCollectionToUser(handle, { chainId: collectionData.chainId, address: collectionData.address });
             break;
           case 'removed':
-            // botAccountManager.removeUserFromList(handle, { chainId: collectionData.chainId, address: collectionData.address });
+            // botAccountManager.unsubscribeCollectionFromUser(handle, { chainId: collectionData.chainId, address: collectionData.address });
             break;
         }
       }
