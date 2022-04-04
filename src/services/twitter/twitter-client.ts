@@ -1,4 +1,5 @@
 import { sleep } from '@infinityxyz/lib/utils';
+import Emittery from 'emittery';
 import PQueue from 'p-queue';
 import phin from 'phin';
 import { TwitterApi } from 'twitter-api-v2';
@@ -34,14 +35,24 @@ interface Endpoint {
   queue: PQueue;
 }
 
-export class TwitterClient {
+type TwitterClientEvents = {
+  rateLimitExceeded: { url: string; rateLimitReset: number; rateLimitRemaining: number };
+  unknownResponseError: { endpoint: TwitterEndpoint; response: phin.IResponse };
+  refreshedToken: { expiresIn: number };
+};
+
+export class TwitterClient extends Emittery<TwitterClientEvents> {
   private endpoints: Map<TwitterEndpoint, Endpoint> = new Map();
 
+  /**
+   * allows an external client to update the credentials used
+   */
   public updateConfig(config: BotAccountConfig) {
     this._config = config;
   }
 
   constructor(private _config: BotAccountConfig, private saveConfig?: (config: BotAccountConfig) => Promise<void>) {
+    super();
     this.keepTokenFresh();
   }
 
@@ -191,9 +202,17 @@ export class TwitterClient {
       case 401:
         await this.refreshToken();
         retry = true;
+        break;
 
       case 429:
         retry = true;
+        break;
+
+      default:
+        this.emit('unknownResponseError', {
+          endpoint,
+          response
+        });
     }
 
     if (attempts >= MAX_REQUEST_ATTEMPTS) {
@@ -210,11 +229,15 @@ export class TwitterClient {
     const limitReset = response.headers['x-rate-limit-reset'] as string;
 
     const resetInSeconds = parseInt(limitReset, 10);
-    const resetInMs = resetInSeconds * 1000;
-    const limitRemainingInt = parseInt(limitRemaining, 10);
+    const rateLimitReset = resetInSeconds * 1000;
+    const rateLimitRemaining = parseInt(limitRemaining, 10);
 
-    ep.rateLimitRemaining = limitRemainingInt;
-    ep.rateLimitReset = resetInMs;
+    ep.rateLimitRemaining = rateLimitRemaining;
+    ep.rateLimitReset = rateLimitReset;
+
+    if (response.statusCode === 429) {
+      void this.emit('rateLimitExceeded', { url: response.url ?? 'unknown', rateLimitRemaining, rateLimitReset });
+    }
   }
 
   private getDefaultEndpoint(): Endpoint {
@@ -268,6 +291,7 @@ export class TwitterClient {
     }
 
     const expiresInMs = expiresIn * 1000;
+    this.emit('refreshedToken', { expiresIn: expiresInMs });
 
     const refreshTokenValidUntil = Date.now() + expiresInMs;
 
