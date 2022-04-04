@@ -35,10 +35,16 @@ interface Endpoint {
   queue: PQueue;
 }
 
+export enum TwitterClientEvent {
+  RateLimitExceeded = 'rate-limit-exceeded',
+  UnknownResponseError = 'unknown-response-error',
+  RefreshedToken = 'refreshed-token'
+}
+
 type TwitterClientEvents = {
-  rateLimitExceeded: { url: string; rateLimitReset: number; rateLimitRemaining: number };
-  unknownResponseError: { endpoint: TwitterEndpoint; response: phin.IResponse };
-  refreshedToken: { expiresIn: number };
+  [TwitterClientEvent.RateLimitExceeded]: { url: string; rateLimitReset: number; rateLimitRemaining: number };
+  [TwitterClientEvent.UnknownResponseError]: { endpoint: TwitterEndpoint; response: phin.IResponse };
+  [TwitterClientEvent.RefreshedToken]: { expiresIn: number };
 };
 
 export class TwitterClient extends Emittery<TwitterClientEvents> {
@@ -209,7 +215,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
         break;
 
       default:
-        this.emit('unknownResponseError', {
+        this.emit(TwitterClientEvent.UnknownResponseError, {
           endpoint,
           response
         });
@@ -236,7 +242,11 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     ep.rateLimitReset = rateLimitReset;
 
     if (response.statusCode === 429) {
-      void this.emit('rateLimitExceeded', { url: response.url ?? 'unknown', rateLimitRemaining, rateLimitReset });
+      void this.emit(TwitterClientEvent.RateLimitExceeded, {
+        url: response.url ?? 'unknown',
+        rateLimitRemaining,
+        rateLimitReset
+      });
     }
   }
 
@@ -291,7 +301,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     }
 
     const expiresInMs = expiresIn * 1000;
-    this.emit('refreshedToken', { expiresIn: expiresInMs });
+    this.emit(TwitterClientEvent.RefreshedToken, { expiresIn: expiresInMs });
 
     const refreshTokenValidUntil = Date.now() + expiresInMs;
 

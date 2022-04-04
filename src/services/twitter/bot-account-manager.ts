@@ -12,8 +12,8 @@ export class BotAccountManager {
   private _botAccounts: Map<string, BotAccount> = new Map();
 
   private isReady: Promise<void>;
-  constructor(private twitterConfig: TwitterConfig) {
-    this.isReady = this.initBotAccounts();
+  constructor(private twitterConfig: TwitterConfig, debug = false) {
+    this.isReady = this.initBotAccounts(debug);
   }
 
   private getNewListName() {
@@ -111,7 +111,7 @@ export class BotAccountManager {
   }
 
   private botAccountsInitialized = false;
-  private async initBotAccounts(): Promise<void> {
+  private async initBotAccounts(debug = false): Promise<void> {
     if (this.botAccountsInitialized) {
       return;
     }
@@ -128,7 +128,7 @@ export class BotAccountManager {
             const isValidConfig = BotAccount.validateConfig(accountConfig);
             if (isValidConfig) {
               console.log('Bot account added', accountConfig.username);
-              const botAccount = new BotAccount(accountConfig, this.twitterConfig);
+              const botAccount = new BotAccount(accountConfig, this.twitterConfig, debug);
               this._botAccounts.set(accountConfig.username, botAccount);
             }
           };

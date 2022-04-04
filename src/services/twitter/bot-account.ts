@@ -5,7 +5,7 @@ import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
 import { TwitterConfig } from './twitter-config';
-import { TwitterClient } from './twitter-client';
+import { TwitterClient, TwitterClientEvent } from './twitter-client';
 
 export class BotAccount extends ConfigListener<BotAccountConfig> {
   static ref(botAccountUsername: string) {
@@ -52,7 +52,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   public client: TwitterClient;
 
   public isReady: Promise<void>;
-  constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig) {
+  constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig, debug = false) {
     super(accountConfig, BotAccount.ref(accountConfig.username));
     this.isReady = this.initLists();
 
@@ -60,6 +60,10 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     this.on('docSnapshot', (config) => {
       this.client.updateConfig(config);
     });
+
+    if (debug) {
+      this.enableDebugging();
+    }
   }
 
   private listsInitialized = false;
@@ -129,5 +133,14 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
 
   private async saveConfig(config: Partial<BotAccountConfig>) {
     await this._docRef.update(config);
+  }
+
+  private enableDebugging() {
+    const events = Object.values(TwitterClientEvent);
+    for (const event of events) {
+      this.client.on(event, (data) => {
+        console.warn(event, data);
+      });
+    }
   }
 }

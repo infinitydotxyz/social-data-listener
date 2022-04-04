@@ -34,7 +34,8 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
   async setup(): Promise<void> {
     const twitterConfig = await this.getTwitterConfig();
-    const botAccountManager = new BotAccountManager(twitterConfig);
+    const debug = true;
+    const botAccountManager = new BotAccountManager(twitterConfig, debug);
 
     const bayc = {
       address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
