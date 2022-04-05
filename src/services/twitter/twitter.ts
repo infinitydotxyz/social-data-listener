@@ -18,7 +18,6 @@ export type TwitterOptions = {
 /**
  * TODO validate that we don't have extra/missing members/collections
  * TODO monitor list tweets and save to db
- * TODO handle errors and rate limits
  * TODO think about what happens if a username changes but user id stays the same
  */
 
@@ -42,10 +41,14 @@ export class Twitter extends Listener<TwitterTweetEvent> {
       chainId: '1'
     };
 
+    botAccountManager.on('tweet', (tweet: any) => {
+      console.log(tweet);
+    });
+
     await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
-    await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
-    await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
-    await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    // await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
+    // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
 
     const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
@@ -66,10 +69,16 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           case 'added':
           case 'modified':
             // TODO: delete old account from the list when the twitter link is modified?
-            // botAccountManager.subscribeCollectionToUser(handle, { chainId: collectionData.chainId, address: collectionData.address });
+            botAccountManager.subscribeCollectionToUser(handle, {
+              chainId: collectionData.chainId,
+              address: collectionData.address
+            });
             break;
           case 'removed':
-            // botAccountManager.unsubscribeCollectionFromUser(handle, { chainId: collectionData.chainId, address: collectionData.address });
+            botAccountManager.unsubscribeCollectionFromUser(handle, {
+              chainId: collectionData.chainId,
+              address: collectionData.address
+            });
             break;
         }
       }

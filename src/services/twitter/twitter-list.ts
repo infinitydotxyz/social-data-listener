@@ -7,6 +7,7 @@ import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
 import { TwitterConfig } from './twitter-config';
 
+export type Tweet = any;
 export class TwitterList extends ConfigListener<ListConfig> {
   static ref(botAccount: BotAccount, listId: string): FirebaseFirestore.DocumentReference<ListConfig> {
     const botAccountRef = BotAccount.ref(botAccount.config.username);
@@ -25,8 +26,39 @@ export class TwitterList extends ConfigListener<ListConfig> {
     return this.allMembersRef.doc(userId) as FirebaseFirestore.DocumentReference<ListMember>;
   }
 
-  constructor(config: ListConfig, private _botAccount: BotAccount, private _twitterConfig: TwitterConfig) {
+  constructor(
+    config: ListConfig,
+    private _botAccount: BotAccount,
+    private _twitterConfig: TwitterConfig,
+    private _onTweet: (tweet: Tweet) => void
+  ) {
     super(config, TwitterList.ref(_botAccount, config.id));
+    void this.monitorTweets();
+  }
+
+  private async monitorTweets() {
+    await this.getTweets();
+  }
+
+  private async getTweets() {
+    const response = await this._botAccount.client.getListTweets(this.config.id, ''); // TODO add cursor
+    const tweets = response.data;
+    // const media = response.includes.media;
+    // const users = response.includes.users;
+    // const meta = response.includes.meta;
+    // const results = meta.results_count;
+    // const cursor = meta.next_token;
+    // console.log(response);
+
+    /**
+     * TODO handle tweets
+     */
+    // const batch = firestore.batch();
+    // batch.update(this._docRef, {
+    //   numTweets: firebaseAdmin.firestore.FieldValue.increment(results),
+    //   cursor: cursor,
+    // });
+    // await batch.commit();
   }
 
   /**

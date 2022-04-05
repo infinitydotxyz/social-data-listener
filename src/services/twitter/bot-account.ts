@@ -80,7 +80,8 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
           if (change.type === 'added') {
             console.log('List added', change.doc.id);
             const listConfig = change.doc.data() as ListConfig;
-            const list = new TwitterList(listConfig, this, this._twitterConfig);
+
+            const list = new TwitterList(listConfig, this, this._twitterConfig, this.onTweet.bind(this));
             this._lists.set(listConfig.id, list);
           } else if (change.type === 'removed') {
             console.log('List removed', change.doc.id);
@@ -95,6 +96,10 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
         }
       });
     });
+  }
+
+  private onTweet(tweet: any) {
+    console.log('tweet', tweet); // TODO emit tweet
   }
 
   /**
@@ -127,7 +132,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
       throw new Error('Failed to create list');
     }
 
-    const list = new TwitterList(listConfig, this, this._twitterConfig);
+    const list = new TwitterList(listConfig, this, this._twitterConfig, this.onTweet.bind(this));
     return list;
   }
 

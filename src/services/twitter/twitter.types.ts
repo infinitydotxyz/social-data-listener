@@ -35,6 +35,8 @@ export interface ListConfig {
   id: string;
   name: string;
   numMembers: number;
+  cursor?: string;
+  totalTweets?: number;
 }
 
 export interface CreateListResponseData {

@@ -7,12 +7,14 @@ import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
 import chalk from 'chalk';
 import { v4 } from 'uuid';
+import Emittery from 'emittery';
 
-export class BotAccountManager {
+export class BotAccountManager extends Emittery<{ tweet: any }> {
   private _botAccounts: Map<string, BotAccount> = new Map();
 
   private isReady: Promise<void>;
   constructor(private twitterConfig: TwitterConfig, debug = false) {
+    super();
     this.isReady = this.initBotAccounts(debug);
   }
 
@@ -46,6 +48,7 @@ export class BotAccountManager {
       }
 
       await list.onCollectionAddUsername(username, collection);
+      console.log('Subscribed collection to user', username);
     } catch (err) {
       console.error('Failed to add user to list', err);
     }
@@ -69,6 +72,7 @@ export class BotAccountManager {
         }
         await list.onCollectionRemoveUsername(username, collection);
       }
+      console.log('Unsubscribed collection from user');
     } catch (err) {
       console.error('Failed to remove user from list', err);
     }

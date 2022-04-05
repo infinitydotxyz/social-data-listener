@@ -14,7 +14,8 @@ enum TwitterEndpoint {
   GetUser = 'get-user',
   CreateList = 'create-list',
   RemoveMemberFromList = 'remove-member-from-list',
-  AddMemberToList = 'add-member-to-list'
+  AddMemberToList = 'add-member-to-list',
+  GetListTweets = 'get-list-tweets'
 }
 
 interface Endpoint {
@@ -29,6 +30,8 @@ interface Endpoint {
    */
   rateLimitRemaining: number;
 
+  expBackOff: number;
+
   /**
    * request queue for the endpoint
    */
@@ -42,8 +45,8 @@ export enum TwitterClientEvent {
 }
 
 type TwitterClientEvents = {
-  [TwitterClientEvent.RateLimitExceeded]: { url: string; rateLimitReset: number; rateLimitRemaining: number };
-  [TwitterClientEvent.UnknownResponseError]: { endpoint: TwitterEndpoint; response: phin.IResponse };
+  [TwitterClientEvent.RateLimitExceeded]: { url: string; rateLimitReset: number; rateLimitRemaining: number; expBackOff: number };
+  [TwitterClientEvent.UnknownResponseError]: { endpoint: TwitterEndpoint; response: string };
   [TwitterClientEvent.RefreshedToken]: { expiresIn: number };
 };
 
@@ -157,6 +160,35 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     };
   }
 
+  public async getListTweets(listId: string, cursor: string) {
+    // 900 per 15 min
+    const response = await this.requestHandler<BasicResponse<any>>(() => {
+      const url = new URL(`https://api.twitter.com/2/lists/${listId}/tweets`);
+      const params = new URLSearchParams({
+        expansions: 'author_id,attachments.media_keys',
+        'tweet.fields': 'author_id,created_at,id,lang,possibly_sensitive,source,text',
+        'user.fields': 'location,name,profile_image_url,username,verified',
+        'media.fields': 'height,width,preview_image_url,type,url,alt_text'
+      });
+
+      url.search = params.toString();
+
+      if (cursor) {
+        url.searchParams.append('pagination_token', cursor);
+      }
+
+      return phin({
+        method: 'GET',
+        url: url,
+        headers: {
+          ...this.authHeaders
+        }
+      });
+    }, TwitterEndpoint.GetListTweets);
+
+    return response;
+  }
+
   private get config() {
     return this._config;
   }
@@ -201,6 +233,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     let retry = false;
     switch (response.statusCode) {
       case 200:
+      case 201:
         const buffer = response.body;
         const res = JSON.parse(buffer.toString()) as Body;
         return res;
@@ -212,12 +245,13 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
       case 429:
         retry = true;
+        await sleep(ep.expBackOff);
         break;
 
       default:
         this.emit(TwitterClientEvent.UnknownResponseError, {
           endpoint,
-          response
+          response: response.body.toString()
         });
     }
 
@@ -242,11 +276,17 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     ep.rateLimitReset = rateLimitReset;
 
     if (response.statusCode === 429) {
+      const prevBackOff = ep.expBackOff || 16_000;
+      const expBackOff = Math.min(2 * (prevBackOff / 1000)) * 1000;
+      ep.expBackOff = expBackOff;
       void this.emit(TwitterClientEvent.RateLimitExceeded, {
-        url: response.url ?? 'unknown',
+        url: response.url || 'unknown',
         rateLimitRemaining,
-        rateLimitReset
+        rateLimitReset,
+        expBackOff
       });
+    } else {
+      ep.expBackOff = 0;
     }
   }
 
@@ -255,8 +295,11 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       rateLimitRemaining: 300,
       rateLimitReset: FIFTEEN_MIN,
       queue: new PQueue({
-        concurrency: 1
-      })
+        concurrency: 1,
+        interval: 3000,
+        intervalCap: 1
+      }),
+      expBackOff: 0
     };
   }
 
