@@ -4,7 +4,9 @@ import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
 import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
 import { BotAccountManager } from './bot-account-manager';
+import { TwitterClient } from './twitter-client';
 import { defaultTwitterConfig, TwitterConfig } from './twitter-config';
+import { TwitterList } from './twitter-list';
 import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
@@ -36,16 +38,27 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     const debug = true;
     const botAccountManager = new BotAccountManager(twitterConfig, debug);
 
-    const bayc = {
-      address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
-      chainId: '1'
-    };
+    // const bayc = {
+    //   address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
+    //   chainId: '1'
+    // };
 
-    botAccountManager.on('tweet', (tweet: any) => {
-      console.log(tweet);
-    });
+    // botAccountManager.on('tweet', (tweet: any) => {
+    //   console.log(tweet);
+    // });
 
-    await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    // const client = new TwitterClient({
+    //   clientId: process.env.TWITTER_CLIENT_ID!,
+    //   clientSecret: process.env.TWITTER_CLIENT_SECRET!,
+    //   username: 'll0_0lj',
+    //   accessToken: process.env.ACCESS_TOKEN!,
+    //   refreshToken: process.env.REFRESH_TOKEN!,
+    //   numLists: 1
+    // });
+
+    // client.addListMembers('1511176754248957955', ['jfrazier_eth'])
+
+    // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
     // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
     // await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
     // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
@@ -54,6 +67,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
     query.onSnapshot(async (snapshot) => {
       const changes = snapshot.docChanges();
+      console.log(`Received: ${changes.length} collections`);
 
       for (const change of changes) {
         // skip collections w/o twitter url

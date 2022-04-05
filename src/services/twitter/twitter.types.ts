@@ -18,7 +18,7 @@ export interface BotAccountConfig {
   /**
    * v1 api creds
    */
-  apiKey: string;
+  apiKey: string; // aka oauth_consumer_key
   apiKeySecret: string;
   accessTokenV1: string;
   accessSecretV1: string;

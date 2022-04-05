@@ -50,4 +50,5 @@ app.get('/callback', async (req, res) => {
     res.status(403).send('Invalid verifier or access tokens!');
   }
 });
+
 app.listen(new URL(process.env.TWITTER_OAUTH_CALLBACK_URL ?? 'http://127.0.0.1:7777').port);

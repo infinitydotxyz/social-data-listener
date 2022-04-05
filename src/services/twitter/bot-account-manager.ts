@@ -18,10 +18,6 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
     this.isReady = this.initBotAccounts(debug);
   }
 
-  private getNewListName() {
-    return v4().substring(0, 20);
-  }
-
   public async subscribeCollectionToUser(username: string, collection: Collection) {
     await this.isReady;
     try {
@@ -38,13 +34,13 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
 
       if (!list) {
         botAccount = this.getBotAccountWithMinMembers();
-        list = botAccount?.getListWithMinMembers();
+        list = await botAccount?.getListWithMinMembers();
       }
 
       if (!botAccount) {
         throw new Error('No bot account found');
       } else if (!list || list.size > this.twitterConfig.config.maxMembersPerList) {
-        list = await botAccount.createList(this.getNewListName());
+        list = await botAccount.createList();
       }
 
       await list.onCollectionAddUsername(username, collection);

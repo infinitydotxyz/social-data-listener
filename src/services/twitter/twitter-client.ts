@@ -3,7 +3,10 @@ import Emittery from 'emittery';
 import PQueue from 'p-queue';
 import phin from 'phin';
 import { TwitterApi } from 'twitter-api-v2';
+import { OAuth1AuthInfo, OAuth1RequestOptions, OAuth1Tokens } from 'twitter-api-v2/dist/client-mixins/oauth1.helper';
 import { BasicResponse, BotAccountConfig, CreateListResponseData, UserIdResponseData } from './twitter.types';
+import { createHmac } from 'crypto';
+import { V1AuthHelper } from './v1-auth-helper';
 
 const FIVE_MIN = 5 * 60 * 1000;
 const FIFTEEN_MIN = 15 * 60 * 1000;
@@ -108,6 +111,31 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     };
   }
 
+  async addListMembers(listId: string, screenNames: string[]): Promise<any> {
+    const url = new URL('https://api.twitter.com/1.1/lists/members/create_all.json');
+    url.searchParams.set('list_id', listId);
+    url.searchParams.set('user_id', screenNames.join(','));
+    const request: OAuth1RequestOptions = {
+      method: 'POST',
+      url: url.toString(),
+      data: {}
+    };
+    const authHelper = new V1AuthHelper(this.config);
+    const authHeaders = authHelper.getAuthHeader(this.config, request);
+
+    const response = await phin({
+      method: 'POST',
+      url: url,
+      headers: {
+        ...authHeaders
+      }
+    });
+    console.log(response.statusCode);
+    console.log(response.statusMessage);
+    const body = response.body.toString();
+    console.log(body);
+  }
+
   /**
    * remove a user from a list
    */
@@ -204,7 +232,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
   private get authHeaders() {
     return {
-      Authorization: `Bearer ${this.config.accessToken}`
+      Authorization: `Bearer ${this.config.accessTokenV2}`
     };
   }
 
@@ -219,45 +247,52 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       this.endpoints.set(endpoint, ep);
     }
 
-    const response = await ep.queue.add(async () => {
+    const { response, successful, shouldRetry } = await ep.queue.add(async () => {
       if (ep?.rateLimitRemaining === 0 && ep?.rateLimitReset > Date.now()) {
         const rateLimitResetIn = ep.rateLimitReset - Date.now();
         await sleep(rateLimitResetIn);
       }
       const res = await request();
-      return res;
+
+      this.updateRateLimit(res, ep!);
+
+      let retry = false;
+
+      switch (res.statusCode) {
+        case 200:
+        case 201:
+          return { response: res, successful: true, shouldRetry: false };
+
+        case 401:
+          await this.refreshToken();
+          retry = true;
+          break;
+
+        case 429:
+          retry = true;
+          await sleep(ep?.expBackOff ?? 10_000);
+          break;
+
+        default:
+          this.emit(TwitterClientEvent.UnknownResponseError, {
+            endpoint,
+            response: res.body.toString()
+          });
+      }
+
+      return { response: res, successful: false, shouldRetry: retry };
     });
 
-    this.updateRateLimit(response, ep);
-
-    let retry = false;
-    switch (response.statusCode) {
-      case 200:
-      case 201:
-        const buffer = response.body;
-        const res = JSON.parse(buffer.toString()) as Body;
-        return res;
-
-      case 401:
-        await this.refreshToken();
-        retry = true;
-        break;
-
-      case 429:
-        retry = true;
-        await sleep(ep.expBackOff);
-        break;
-
-      default:
-        this.emit(TwitterClientEvent.UnknownResponseError, {
-          endpoint,
-          response: response.body.toString()
-        });
+    if (successful) {
+      const buffer = response.body;
+      const body = buffer.toString();
+      const parsed = JSON.parse(body) as Body;
+      return parsed;
     }
 
     if (attempts >= MAX_REQUEST_ATTEMPTS) {
       throw new Error(`Failed to make request in ${MAX_REQUEST_ATTEMPTS} attempts. Status Code: ${response.statusCode}`);
-    } else if (retry) {
+    } else if (shouldRetry) {
       return this.requestHandler(request, endpoint, attempts + 1);
     } else {
       throw new Error(`Encountered unknown status code: ${response.statusCode} url: ${response.url}`);
@@ -337,7 +372,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       clientSecret: this.config.clientSecret
     });
 
-    const { accessToken, refreshToken, expiresIn } = await client.refreshOAuth2Token(this.config.refreshToken);
+    const { accessToken, refreshToken, expiresIn } = await client.refreshOAuth2Token(this.config.refreshTokenV2);
 
     if (!refreshToken) {
       throw new Error('failed to get refresh token');
@@ -350,8 +385,8 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
     this.config = {
       ...this.config,
-      accessToken,
-      refreshToken,
+      accessTokenV2: accessToken,
+      refreshTokenV2: refreshToken,
       refreshTokenValidUntil
     };
   }

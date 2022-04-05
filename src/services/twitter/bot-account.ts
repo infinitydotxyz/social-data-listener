@@ -6,6 +6,7 @@ import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
 import { TwitterConfig } from './twitter-config';
 import { TwitterClient, TwitterClientEvent } from './twitter-client';
+import { v4 } from 'uuid';
 
 export class BotAccount extends ConfigListener<BotAccountConfig> {
   static ref(botAccountUsername: string) {
@@ -20,38 +21,18 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   static validateConfig(config: BotAccountConfig): boolean {
     const hasUsername = !!config.username;
     const canRefresh = !!config.clientId && !!config.clientSecret;
-    const oAuthReady = !!config.accessToken && !!config.refreshToken;
+    const oAuthV1Ready = !!config.apiKey && !!config.apiKeySecret && !!config.accessTokenV1 && !!config.accessSecretV1;
+    const oAuthV2Ready = !!config.accessTokenV2 && !!config.refreshTokenV2;
 
-    return hasUsername && canRefresh && oAuthReady;
-  }
-
-  private _lists: Map<string, TwitterList> = new Map();
-
-  public getListsMembers() {
-    let sum = 0;
-    for (const [, list] of this._lists) {
-      sum += list.size;
-    }
-    return sum;
-  }
-
-  public getListWithMinMembers() {
-    let minList: TwitterList | undefined;
-    for (const [, list] of this._lists) {
-      if (!minList || list.size < minList.size) {
-        minList = list;
-      }
-    }
-    return minList;
-  }
-
-  public getListById(id: string): TwitterList | undefined {
-    return this._lists.get(id);
+    return hasUsername && canRefresh && oAuthV1Ready && oAuthV2Ready;
   }
 
   public client: TwitterClient;
 
   public isReady: Promise<void>;
+
+  private _lists: Map<string, TwitterList> = new Map();
+
   constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig, debug = false) {
     super(accountConfig, BotAccount.ref(accountConfig.username));
     this.isReady = this.initLists();
@@ -64,6 +45,37 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     if (debug) {
       this.enableDebugging();
     }
+  }
+
+  public getListsMembers() {
+    let sum = 0;
+    for (const [, list] of this._lists) {
+      sum += list.size;
+    }
+    return sum;
+  }
+
+  public async getListWithMinMembers() {
+    if (this._lists.size < this._twitterConfig.config.maxListsPerAccount) {
+      try {
+        const newList = await this.createList();
+        return newList;
+      } catch (err) {
+        console.error('Failed to create a new list', err);
+      }
+    }
+
+    let minList: TwitterList | undefined;
+    for (const [, list] of this._lists) {
+      if (!minList || list.size < minList.size) {
+        minList = list;
+      }
+    }
+    return minList;
+  }
+
+  public getListById(id: string): TwitterList | undefined {
+    return this._lists.get(id);
   }
 
   private listsInitialized = false;
@@ -105,7 +117,8 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   /**
    * create a list for the bot account to manage
    */
-  public async createList(name: string): Promise<TwitterList> {
+  public async createList(): Promise<TwitterList> {
+    const name = this.getNewListName();
     let listConfig: ListConfig = {} as any;
     await firestore.runTransaction(async (tx) => {
       const config = (await tx.get(this._docRef)).data() as BotAccountConfig;
@@ -138,6 +151,10 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
 
   private async saveConfig(config: Partial<BotAccountConfig>) {
     await this._docRef.update(config);
+  }
+
+  private getNewListName() {
+    return v4().substring(0, 20);
   }
 
   private enableDebugging() {
