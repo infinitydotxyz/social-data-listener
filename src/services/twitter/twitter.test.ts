@@ -1,4 +1,4 @@
-import { AccessLevel } from './access-level';
+import { AccessLevel } from './client/access-level';
 import { Twitter } from './twitter';
 import { dbMock } from '../../test/mocks';
 

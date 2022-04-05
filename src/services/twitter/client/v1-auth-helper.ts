@@ -1,5 +1,5 @@
 import OAuth1Helper from 'twitter-api-v2/dist/client-mixins/oauth1.helper';
-import { BotAccountConfig } from './twitter.types';
+import { BotAccountConfig } from '../twitter.types';
 
 export class V1AuthHelper extends OAuth1Helper {
   constructor(config: BotAccountConfig) {

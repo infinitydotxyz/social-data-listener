@@ -12,10 +12,6 @@ export interface TwitterConfig {
 
 export interface BotAccountConfig {
   /**
-   * TODO are these needed for monitoring tweets?
-   * if so, make sure to adjust the validate method of BotAccount
-   */
-  /**
    * v1 api creds
    */
   apiKey: string; // aka oauth_consumer_key

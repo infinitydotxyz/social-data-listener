@@ -3,9 +3,8 @@ import Emittery from 'emittery';
 import PQueue from 'p-queue';
 import phin from 'phin';
 import { TwitterApi } from 'twitter-api-v2';
-import { OAuth1AuthInfo, OAuth1RequestOptions, OAuth1Tokens } from 'twitter-api-v2/dist/client-mixins/oauth1.helper';
-import { BasicResponse, BotAccountConfig, CreateListResponseData, UserIdResponseData } from './twitter.types';
-import { createHmac } from 'crypto';
+import { OAuth1RequestOptions } from 'twitter-api-v2/dist/client-mixins/oauth1.helper';
+import { BasicResponse, BotAccountConfig, CreateListResponseData, UserIdResponseData } from '../twitter.types';
 import { V1AuthHelper } from './v1-auth-helper';
 
 const FIVE_MIN = 5 * 60 * 1000;

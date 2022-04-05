@@ -1,2 +1,2 @@
 export * from './twitter';
-export * from './access-level';
+export * from './client/access-level';

@@ -8,7 +8,7 @@ import { firestore } from '../../container';
 import Listener, { OnEvent } from '../listener';
 import { BotAccount } from './bot-account';
 import { BotAccountManager } from './bot-account-manager';
-import { TwitterClient } from './twitter-client';
+import { TwitterClient } from './client/twitter-client';
 import { defaultTwitterConfig, TwitterConfig } from './twitter-config';
 import { TwitterList } from './twitter-list';
 import { BotAccountConfig, TwitterConfig as ITwitterConfig } from './twitter.types';

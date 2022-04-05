@@ -5,7 +5,7 @@ import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
 import { TwitterConfig } from './twitter-config';
-import { TwitterClient, TwitterClientEvent } from './twitter-client';
+import { TwitterClient, TwitterClientEvent } from './client/twitter-client';
 import { v4 } from 'uuid';
 
 export class BotAccount extends ConfigListener<BotAccountConfig> {
