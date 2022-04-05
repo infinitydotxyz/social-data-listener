@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "start:dev": "ts-node src/main.ts",
     "watch": "nodemon src/main.ts",
-    "script:twitter": "npx ts-node src/scripts/get-twitter-oauth-tokens.ts"
+    "script:twitter": "npx ts-node src/scripts/get-twitter-oauth-tokens.ts",
+    "script:login": "npx ts-node -r dotenv/config src/scripts/create-bot-account.ts"
   },
   "keywords": [],
   "author": "",

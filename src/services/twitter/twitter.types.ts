@@ -15,15 +15,28 @@ export interface BotAccountConfig {
    * TODO are these needed for monitoring tweets?
    * if so, make sure to adjust the validate method of BotAccount
    */
-  // apiKey: string;
-  // apiKeySecret: string;
-  // bearerToken: string;
+  /**
+   * v1 api creds
+   */
+  apiKey: string;
+  apiKeySecret: string;
+  accessTokenV1: string;
+  accessSecretV1: string;
+
+  /**
+   * v2 api creds
+   */
   clientId: string;
   clientSecret: string;
-  username: string;
-  accessToken: string;
-  refreshToken: string;
+  accessTokenV2: string;
+  refreshTokenV2: string;
   refreshTokenValidUntil?: number;
+
+  /**
+   */
+  username: string;
+
+  id: string;
 
   /**
    * number of lists this account has
