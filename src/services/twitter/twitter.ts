@@ -1,13 +1,17 @@
 import { Collection } from '@infinityxyz/lib/types/core/Collection';
 import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
+import { resolveConfigFile } from 'prettier';
 import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
+import { socialDataFirestoreConstants } from '../../constants';
+import { firestore } from '../../container';
 import Listener, { OnEvent } from '../listener';
+import { BotAccount } from './bot-account';
 import { BotAccountManager } from './bot-account-manager';
 import { TwitterClient } from './twitter-client';
 import { defaultTwitterConfig, TwitterConfig } from './twitter-config';
 import { TwitterList } from './twitter-list';
-import { TwitterConfig as ITwitterConfig } from './twitter.types';
+import { BotAccountConfig, TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -36,7 +40,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   async setup(): Promise<void> {
     const twitterConfig = await this.getTwitterConfig();
     const debug = true;
-    const botAccountManager = new BotAccountManager(twitterConfig, debug);
+    // const botAccountManager = new BotAccountManager(twitterConfig, debug);
 
     // const bayc = {
     //   address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
@@ -46,15 +50,20 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     // botAccountManager.on('tweet', (tweet: any) => {
     //   console.log(tweet);
     // });
+    const twitterConfigRef = firestore
+      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+      .doc(socialDataFirestoreConstants.TWITTER_DOC);
 
-    // const client = new TwitterClient({
-    //   clientId: process.env.TWITTER_CLIENT_ID!,
-    //   clientSecret: process.env.TWITTER_CLIENT_SECRET!,
-    //   username: 'll0_0lj',
-    //   accessToken: process.env.ACCESS_TOKEN!,
-    //   refreshToken: process.env.REFRESH_TOKEN!,
-    //   numLists: 1
-    // });
+    const botAccountConfigRef = twitterConfigRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL).doc('ll0_0lj');
+
+    const snap = await botAccountConfigRef.get();
+    const config = snap.data() as BotAccountConfig;
+    const botAccount = new BotAccount(config, twitterConfig, true);
+    await botAccount.isReady;
+    console.log(botAccount.config);
+
+    const res = await botAccount.client.addListMembers('1511176754248957955', ['jfrazier_eth']);
+    console.log(res);
 
     // client.addListMembers('1511176754248957955', ['jfrazier_eth'])
 
@@ -63,40 +72,40 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     // await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
     // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
 
-    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+    // const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
-    query.onSnapshot(async (snapshot) => {
-      const changes = snapshot.docChanges();
-      console.log(`Received: ${changes.length} collections`);
+    // query.onSnapshot(async (snapshot) => {
+    //   const changes = snapshot.docChanges();
+    //   console.log(`Received: ${changes.length} collections`);
 
-      for (const change of changes) {
-        // skip collections w/o twitter url
-        const collectionData = change.doc.data() as Partial<Collection>;
-        const url = collectionData.metadata?.links?.twitter;
-        if (!url || !collectionData.address || !collectionData.chainId) continue;
+    //   for (const change of changes) {
+    //     // skip collections w/o twitter url
+    //     const collectionData = change.doc.data() as Partial<Collection>;
+    //     const url = collectionData.metadata?.links?.twitter;
+    //     if (!url || !collectionData.address || !collectionData.chainId) continue;
 
-        // skip invalid handles
-        const handle = Twitter.extractHandle(url).trim();
-        if (!handle) continue;
+    //     // skip invalid handles
+    //     const handle = Twitter.extractHandle(url).trim();
+    //     if (!handle) continue;
 
-        switch (change.type) {
-          case 'added':
-          case 'modified':
-            // TODO: delete old account from the list when the twitter link is modified?
-            botAccountManager.subscribeCollectionToUser(handle, {
-              chainId: collectionData.chainId,
-              address: collectionData.address
-            });
-            break;
-          case 'removed':
-            botAccountManager.unsubscribeCollectionFromUser(handle, {
-              chainId: collectionData.chainId,
-              address: collectionData.address
-            });
-            break;
-        }
-      }
-    });
+    //     switch (change.type) {
+    //       case 'added':
+    //       case 'modified':
+    //         // TODO: delete old account from the list when the twitter link is modified?
+    //         botAccountManager.subscribeCollectionToUser(handle, {
+    //           chainId: collectionData.chainId,
+    //           address: collectionData.address
+    //         });
+    //         break;
+    //       case 'removed':
+    //         botAccountManager.unsubscribeCollectionFromUser(handle, {
+    //           chainId: collectionData.chainId,
+    //           address: collectionData.address
+    //         });
+    //         break;
+    //     }
+    //   }
+    // });
   }
 
   private async getTwitterConfig() {

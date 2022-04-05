@@ -115,17 +115,19 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     const url = new URL('https://api.twitter.com/1.1/lists/members/create_all.json');
     url.searchParams.set('list_id', listId);
     url.searchParams.set('user_id', screenNames.join(','));
+
     const request: OAuth1RequestOptions = {
       method: 'POST',
       url: url.toString(),
       data: {}
     };
+
     const authHelper = new V1AuthHelper(this.config);
     const authHeaders = authHelper.getAuthHeader(this.config, request);
+    console.log(authHeaders);
 
     const response = await phin({
-      method: 'POST',
-      url: url,
+      ...request,
       headers: {
         ...authHeaders
       }

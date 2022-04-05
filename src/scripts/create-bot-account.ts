@@ -9,6 +9,7 @@ import { BotAccountConfig } from '../services/twitter/twitter.types';
 const success = (message?: any, ...optionalParams: any[]) => console.log(chalk.green(message, ...optionalParams, '\n'));
 const error = (message?: any, ...optionalParams: any[]) => console.log(chalk.red(message, ...optionalParams, '\n'));
 const info = (message?: any, ...optionalParams: any[]) => console.log(chalk.blue(message, ...optionalParams, '\n'));
+const warn = (message?: any, ...optionalParams: any[]) => console.log(chalk.yellow(message, ...optionalParams, '\n'));
 
 /**
  * env variables
@@ -61,8 +62,11 @@ async function createAccount() {
   /**
    * v1 oauth
    */
-  const authLink = await v1Client.generateAuthLink(v1CallbackUrl.toString());
-  info(`Click this link to authenticate the application for v1 endpoints: ${authLink.url}`);
+  const authLink = await v1Client.generateAuthLink(v1CallbackUrl.toString(), {
+    authAccessType: 'write'
+  });
+  info(`Click this link to authenticate the application for v1 endpoints`);
+  warn(authLink.url);
   authToken = authLink.oauth_token;
   authTokenSecret = authLink.oauth_token_secret;
 
@@ -83,8 +87,8 @@ async function createAccount() {
   });
   codeVerifier = v2AuthLink.codeVerifier;
   sessionState = v2AuthLink.state;
-  info(`Click this link to authenticate the application for v2 endpoints: ${v2AuthLink.url}`);
-
+  info(`Click this link to authenticate the application for v2 endpoints`);
+  warn(v2AuthLink.url);
   info(`Waiting for v2 creds...`);
   try {
     const v2 = await v2Creds;
@@ -161,8 +165,8 @@ app.get(v1CallbackUrl.pathname, async (req, res) => {
       id,
       apiKey: CONSUMER_KEY,
       apiKeySecret: CONSUMER_SECRET,
-      accessTokenV1: oauth_token as string,
-      accessSecretV1: authTokenSecret
+      accessTokenV1: accessToken as string,
+      accessSecretV1: accessSecret
     });
     res.status(200).send('success');
   } catch (err) {
