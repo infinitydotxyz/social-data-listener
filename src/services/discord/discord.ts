@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 import { DiscordConfig } from './config';
 import { Client, Intents, TextChannel } from 'discord.js';
 import { DiscordIntegration } from '@infinityxyz/lib/types/core';
@@ -55,20 +56,22 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
       console.log('Started monitoring discord channels');
     });
 
-    // fired when joining a new discord server
+    // Fired when joining a new discord server
     client.on('guildCreate', async (guild) => {
       await this.registerCommands(guild.id);
     });
 
-    client.on('interactionCreate', async (interaction) => {
-      if (!interaction.isCommand()) return;
+    client.on('interactionCreate', (interaction) => {
+      if (!interaction.isCommand()) {
+        return;
+      }
 
       const { commandName, options } = interaction;
 
       if (commandName === 'infinity' && options.getSubcommand() === 'verify') {
         const address = options.getString('address');
         // TODO: Verify based on unique token instead of guild id (Slightly better security, though unlikely a collection owner is gonna input a wrong guild id to sabotage themselves. The collection address is already securely verified.)
-        interaction.reply(
+        void interaction.reply(
           `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`
         );
       }
@@ -82,8 +85,9 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
         .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
         .get();
       if (integrations.size) {
-        handler({
+        void handler({
           id: msg.id,
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           guildId: msg.guildId!,
           authorId: msg.author.id,
           author: msg.author.username,

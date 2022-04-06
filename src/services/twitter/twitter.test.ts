@@ -20,7 +20,7 @@ test('should convert handle to URL', () => {
 
 test('should build stream rules from twitter accounts', () => {
   const twitter = new Twitter({}, dbMock);
-  let accounts = [
+  const accounts = [
     'goatlodge',
     'BattleVerse_io',
     'chromorphs',
@@ -51,7 +51,7 @@ test('should build stream rules from twitter accounts', () => {
     '(from:goatlodge OR from:BattleVerse_io OR from:chromorphs OR from:bullsontheblock OR from:JohnOrionYoung OR from:the_n_project_ OR from:superplastic OR from:PixlsOfficial OR from:LuckyManekiNFT OR from:TheProjectURS OR from:robotosNFT OR from:satoshibles OR from:SaconiGen OR from:FatalesNFT OR from:10KTFShop OR from:nahfungiblebone OR from:lostsoulsnft OR from:DropBearsio OR from:cryptoadzNFT OR from:MekaVerse OR from:boredapeyc OR from:pudgy_penguins OR from:worldofwomennft)'
   );
 
-  // push some more data in order to exceed length limit
+  // Push some more data in order to exceed length limit
   accounts.push('sleeyax');
   accounts.push('jfrazier');
   accounts.push('elonmusk');

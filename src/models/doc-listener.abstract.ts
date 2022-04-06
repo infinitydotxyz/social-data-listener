@@ -10,7 +10,7 @@ export default abstract class DocListener<T> extends Emittery<DocSnapshotEmitter
   protected _listen() {
     this._docRef.onSnapshot((snapshot) => {
       const data = snapshot.data() as T;
-      this.emit('docSnapshot', data);
+      void this.emit('docSnapshot', data);
     });
   }
 }

@@ -22,20 +22,20 @@ enum TwitterEndpoint {
 
 interface Endpoint {
   /**
-   * remaining window until the rate limit resets
+   * Remaining window until the rate limit resets
    * UTC epoch ms
    */
   rateLimitReset: number;
 
   /**
-   * number of requests left for the period
+   * Number of requests left for the period
    */
   rateLimitRemaining: number;
 
   expBackOff: number;
 
   /**
-   * request queue for the endpoint
+   * Request queue for the endpoint
    */
   queue: PQueue;
 }
@@ -56,7 +56,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
   private endpoints: Map<TwitterEndpoint, Endpoint> = new Map();
 
   /**
-   * allows an external client to update the credentials used
+   * Allows an external client to update the credentials used
    */
   public updateConfig(config: BotAccountConfig) {
     this._config = config;
@@ -68,7 +68,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
   }
 
   /**
-   * get a user object from twitter via a username
+   * Get a user object from twitter via a username
    */
   public async getUser(username: string): Promise<UserIdResponseData> {
     const response = await this.requestHandler<BasicResponse<UserIdResponseData>>(() => {
@@ -85,7 +85,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
   }
 
   /**
-   * add a user to a list
+   * Add a user to a list
    */
   async addListMember(listId: string, memberId: string): Promise<{ isUserMember: boolean }> {
     const response = await this.requestHandler<BasicResponse<{ is_member: boolean }>>(() => {
@@ -138,7 +138,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
   }
 
   /**
-   * remove a user from a list
+   * Remove a user from a list
    */
   async removeListMember(listId: string, memberId: string): Promise<{ isUserMember: boolean }> {
     const response = await this.requestHandler<BasicResponse<{ is_member: boolean }>>(() => {
@@ -161,7 +161,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
   }
 
   /**
-   * create a new list
+   * Create a new list
    */
   public async createTwitterList(name: string) {
     const response = await this.requestHandler<BasicResponse<CreateListResponseData>>(() => {
@@ -255,6 +255,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       }
       const res = await request();
 
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       this.updateRateLimit(res, ep!);
 
       let retry = false;
@@ -275,7 +276,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
           break;
 
         default:
-          this.emit(TwitterClientEvent.UnknownResponseError, {
+          void this.emit(TwitterClientEvent.UnknownResponseError, {
             endpoint,
             response: res.body.toString()
           });
@@ -348,11 +349,15 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       }
     };
 
-    refresh().then(() => {
-      setInterval(async () => {
-        await refresh();
-      }, 60_000);
-    });
+    refresh()
+      .then(() => {
+        setInterval(async () => {
+          await refresh();
+        }, 60_000);
+      })
+      .catch((err) => {
+        console.error('Failed to start token refresh', err);
+      });
   }
 
   private get _tokenValid(): boolean {
@@ -380,7 +385,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     }
 
     const expiresInMs = expiresIn * 1000;
-    this.emit(TwitterClientEvent.RefreshedToken, { expiresIn: expiresInMs });
+    void this.emit(TwitterClientEvent.RefreshedToken, { expiresIn: expiresInMs });
 
     const refreshTokenValidUntil = Date.now() + expiresInMs;
 

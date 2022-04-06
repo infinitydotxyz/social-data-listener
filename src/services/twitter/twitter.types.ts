@@ -1,26 +1,26 @@
 export interface TwitterConfig {
   /**
-   * the number of lists that each bot account can have
+   * The number of lists that each bot account can have
    */
   maxListsPerAccount: number;
 
   /**
-   * the max number of accounts that can be members of a list
+   * The max number of accounts that can be members of a list
    */
   maxMembersPerList: number;
 }
 
 export interface BotAccountConfig {
   /**
-   * v1 api creds
+   * V1 api creds
    */
-  apiKey: string; // aka oauth_consumer_key
+  apiKey: string; // Aka oauth_consumer_key
   apiKeySecret: string;
   accessTokenV1: string;
   accessSecretV1: string;
 
   /**
-   * v2 api creds
+   * V2 api creds
    */
   clientId: string;
   clientSecret: string;
@@ -35,7 +35,7 @@ export interface BotAccountConfig {
   id: string;
 
   /**
-   * number of lists this account has
+   * Number of lists this account has
    */
   numLists: number;
 }

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { BaseFeedEvent } from '@infinityxyz/lib/types/core/feed';
 import { getDb } from '../database';
 import { Discord } from './discord';
@@ -45,8 +47,8 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
 
   const services: Listener<any>[] = [
     twitter
-    // discord,
-    // coinmarketcap
+    // Discord,
+    // Coinmarketcap
   ];
 
   for (const service of services) {

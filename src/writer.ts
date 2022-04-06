@@ -15,9 +15,11 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
     case FeedEventType.DiscordAnnouncement:
       let query = db.collection(firestoreConstants.COLLECTIONS_COLL).select('address');
 
-      if (event.type === FeedEventType.TwitterTweet)
+      if (event.type === FeedEventType.TwitterTweet) {
         query = query.where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username));
-      else query = query.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
+      } else {
+        query = query.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
+      }
 
       const snapshot = await query.get();
 
@@ -34,7 +36,7 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
 
       break;
     case FeedEventType.CoinMarketCapNews:
-      // await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
+      // Await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
       break;
     default:
       throw new Error(`Unexpected event '${event.type}'!`);

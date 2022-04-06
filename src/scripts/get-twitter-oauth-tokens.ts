@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /**
  * This script can be used to generate the required Oauth 2 Access and Refresh tokens for your twitter user account.
  *
@@ -28,13 +29,16 @@ console.log();
 
 const app = express();
 app.get('/callback', async (req, res) => {
-  // extract state and code from query params
+  // Extract state and code from query params
   const { state, code } = req.query;
 
-  // verify
-  if (!codeVerifier || !sessionState || !state || !code)
+  // Verify
+  if (!codeVerifier || !sessionState || !state || !code) {
     return res.status(400).send('You denied the app or your session expired!');
-  if (state !== sessionState) return res.status(400).send("Stored tokens didn't match!");
+  }
+  if (state !== sessionState) {
+    return res.status(400).send("Stored tokens didn't match!");
+  }
 
   try {
     const { accessToken, refreshToken, expiresIn } = await client.loginWithOAuth2({

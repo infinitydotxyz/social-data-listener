@@ -86,11 +86,11 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     this.listsInitialized = true;
     let resolved = false;
     return new Promise((resolve) => {
-      this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).onSnapshot((listConfigsSnapshot) => {
+      this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).onSnapshot(async (listConfigsSnapshot) => {
         const changes = listConfigsSnapshot.docChanges();
         for (const change of changes) {
           if (change.type === 'added') {
-            console.log('List added', change.doc.id);
+            console.log('List loaded', change.doc.id);
             const listConfig = change.doc.data() as ListConfig;
 
             const list = new TwitterList(listConfig, this, this._twitterConfig, this.onTweet.bind(this));
@@ -98,7 +98,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
           } else if (change.type === 'removed') {
             console.log('List removed', change.doc.id);
             this._lists.delete(change.doc.id);
-            this._docRef.update({ numLists: firebaseAdmin.firestore.FieldValue.increment(-1) });
+            await this._docRef.update({ numLists: firebaseAdmin.firestore.FieldValue.increment(-1) });
           }
         }
 
@@ -115,7 +115,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   }
 
   /**
-   * create a list for the bot account to manage
+   * Create a list for the bot account to manage
    */
   public async createList(): Promise<TwitterList> {
     const name = this.getNewListName();

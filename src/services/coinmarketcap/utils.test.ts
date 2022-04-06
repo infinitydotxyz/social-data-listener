@@ -24,14 +24,14 @@ test('should deduplicte news articles', () => {
   };
 
   const articlesInDb: Article[] = [
-    // assuming the first item was added the latest
+    // Assuming the first item was added the latest
     { ...base, slug: 'old-1' },
     { ...base, slug: 'old-2' },
     { ...base, slug: 'old-3' }
   ];
 
   const articlesFromApi: Article[] = [
-    // assuming the first items are fresh from the API (and thus not stored in our db)
+    // Assuming the first items are fresh from the API (and thus not stored in our db)
     { ...base, slug: 'new-1' },
     { ...base, slug: 'new-2' },
     { ...base, slug: 'old-1' },

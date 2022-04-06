@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Collection } from '@infinityxyz/lib/types/core/Collection';
 import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
@@ -40,15 +41,15 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   async setup(): Promise<void> {
     const twitterConfig = await this.getTwitterConfig();
     const debug = true;
-    // const botAccountManager = new BotAccountManager(twitterConfig, debug);
+    // Const botAccountManager = new BotAccountManager(twitterConfig, debug);
 
-    // const bayc = {
-    //   address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
-    //   chainId: '1'
+    // Const bayc = {
+    //   Address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
+    //   ChainId: '1'
     // };
 
-    // botAccountManager.on('tweet', (tweet: any) => {
-    //   console.log(tweet);
+    // BotAccountManager.on('tweet', (tweet: any) => {
+    //   Console.log(tweet);
     // });
     const twitterConfigRef = firestore
       .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
@@ -60,49 +61,48 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     const config = snap.data() as BotAccountConfig;
     const botAccount = new BotAccount(config, twitterConfig, true);
     await botAccount.isReady;
-    console.log(botAccount.config);
 
     const res = await botAccount.client.addListMembers('1511176754248957955', ['jfrazier_eth']);
     console.log(res);
 
-    // client.addListMembers('1511176754248957955', ['jfrazier_eth'])
+    // Client.addListMembers('1511176754248957955', ['jfrazier_eth'])
 
-    // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
-    // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
-    // await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
-    // await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    // Await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    // Await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
+    // Await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
+    // Await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
 
-    // const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+    // Const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
-    // query.onSnapshot(async (snapshot) => {
-    //   const changes = snapshot.docChanges();
-    //   console.log(`Received: ${changes.length} collections`);
+    // Query.onSnapshot(async (snapshot) => {
+    //   Const changes = snapshot.docChanges();
+    //   Console.log(`Received: ${changes.length} collections`);
 
-    //   for (const change of changes) {
+    //   For (const change of changes) {
     //     // skip collections w/o twitter url
-    //     const collectionData = change.doc.data() as Partial<Collection>;
-    //     const url = collectionData.metadata?.links?.twitter;
-    //     if (!url || !collectionData.address || !collectionData.chainId) continue;
+    //     Const collectionData = change.doc.data() as Partial<Collection>;
+    //     Const url = collectionData.metadata?.links?.twitter;
+    //     If (!url || !collectionData.address || !collectionData.chainId) continue;
 
     //     // skip invalid handles
-    //     const handle = Twitter.extractHandle(url).trim();
-    //     if (!handle) continue;
+    //     Const handle = Twitter.extractHandle(url).trim();
+    //     If (!handle) continue;
 
-    //     switch (change.type) {
-    //       case 'added':
-    //       case 'modified':
+    //     Switch (change.type) {
+    //       Case 'added':
+    //       Case 'modified':
     //         // TODO: delete old account from the list when the twitter link is modified?
-    //         botAccountManager.subscribeCollectionToUser(handle, {
-    //           chainId: collectionData.chainId,
-    //           address: collectionData.address
+    //         BotAccountManager.subscribeCollectionToUser(handle, {
+    //           ChainId: collectionData.chainId,
+    //           Address: collectionData.address
     //         });
-    //         break;
-    //       case 'removed':
-    //         botAccountManager.unsubscribeCollectionFromUser(handle, {
-    //           chainId: collectionData.chainId,
-    //           address: collectionData.address
+    //         Break;
+    //       Case 'removed':
+    //         BotAccountManager.unsubscribeCollectionFromUser(handle, {
+    //           ChainId: collectionData.chainId,
+    //           Address: collectionData.address
     //         });
-    //         break;
+    //         Break;
     //     }
     //   }
     // });
@@ -138,22 +138,22 @@ export class Twitter extends Listener<TwitterTweetEvent> {
    * Automatically retries the request on rate limit. Also refreshes auth tokens automatically.
    */
   async autoRetry<T>(callback: () => T | Promise<T>) {
-    while (true) {
+    for (;;) {
       try {
         return await callback();
       } catch (error) {
         if (error instanceof ApiResponseError) {
-          // retry on rate limit
+          // Retry on rate limit
           if (error.rateLimitError && error.rateLimit) {
-            const resetTimeout = error.rateLimit.reset * 1000; // convert to ms time instead of seconds time
+            const resetTimeout = error.rateLimit.reset * 1000; // Convert to ms time instead of seconds time
             const timeToWait = resetTimeout - Date.now();
             console.log(`Rate limit hit! Waiting ${timeToWait} ms...`);
             await sleep(timeToWait);
           }
-          // retry when oauth tokens are expired
+          // Retry when oauth tokens are expired
           else if (error.code === 401) {
             console.log('Tokens expired');
-            // create a new client because for some reason mixing clientId with bearerToken from `this.Api` (accessToken) doesn't work properly (odd TS error)
+            // Create a new client because for some reason mixing clientId with bearerToken from `this.Api` (accessToken) doesn't work properly (odd TS error)
             const client = new TwitterApi({
               clientId: this.options.clientId,
               clientSecret: this.options.clientSecret
@@ -162,7 +162,9 @@ export class Twitter extends Listener<TwitterTweetEvent> {
             console.log('new tokens success', accessToken, refreshToken);
             this.api = new TwitterApi(accessToken);
             this.options.accessToken = accessToken;
-            if (refreshToken) this.options.refreshToken = refreshToken;
+            if (refreshToken) {
+              this.options.refreshToken = refreshToken;
+            }
           }
           continue;
         }
@@ -195,7 +197,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
    * Watch the list on twitter for new tweets.
    */
   private async watchList() {
-    /* while (true) {
+    /* While (true) {
       console.log('watching watchlist');
       await sleep(1000);
     } */
@@ -203,8 +205,8 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   monitor(handler: OnEvent<TwitterTweetEvent>): void {
-    this.watchList();
-    /* this.streamTweets((tweet) => {
+    void this.watchList();
+    /* This.streamTweets((tweet) => {
       const media = tweet.includes?.media?.[0];
       const user = tweet.includes?.users?.[0];
 

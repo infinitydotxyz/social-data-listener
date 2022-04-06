@@ -41,28 +41,27 @@ export class TwitterList extends ConfigListener<ListConfig> {
   }
 
   private async getTweets() {
-    const response = await this._botAccount.client.getListTweets(this.config.id, ''); // TODO add cursor
-    const tweets = response.data;
-    // const media = response.includes.media;
-    // const users = response.includes.users;
-    // const meta = response.includes.meta;
-    // const results = meta.results_count;
-    // const cursor = meta.next_token;
-    // console.log(response);
-
+    // Const response = await this._botAccount.client.getListTweets(this.config.id, ''); // TODO add cursor
+    // Const tweets = response.data;
+    // Const media = response.includes.media;
+    // Const users = response.includes.users;
+    // Const meta = response.includes.meta;
+    // Const results = meta.results_count;
+    // Const cursor = meta.next_token;
+    // Console.log(response);
     /**
      * TODO handle tweets
      */
-    // const batch = firestore.batch();
-    // batch.update(this._docRef, {
-    //   numTweets: firebaseAdmin.firestore.FieldValue.increment(results),
-    //   cursor: cursor,
+    // Const batch = firestore.batch();
+    // Batch.update(this._docRef, {
+    //   NumTweets: firebaseAdmin.firestore.FieldValue.increment(results),
+    //   Cursor: cursor,
     // });
-    // await batch.commit();
+    // Await batch.commit();
   }
 
   /**
-   * returns the number of members in the list
+   * Returns the number of members in the list
    */
   public get size() {
     return this.config.numMembers;
@@ -73,13 +72,13 @@ export class TwitterList extends ConfigListener<ListConfig> {
   }
 
   /**
-   * handle adding a collection to the list
+   * Handle adding a collection to the list
    */
   public async onCollectionAddUsername(username: string, collection: Collection) {
     const member = await this.addMember(username);
 
-    // add collection to user
-    TwitterList.getMemberRef(member.userId).update({
+    // Add collection to user
+    await TwitterList.getMemberRef(member.userId).update({
       collections: {
         ...member.collections,
         [this.getCollectionKey(collection)]: {
@@ -92,7 +91,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
   }
 
   /**
-   * handle deleting a collection from the list
+   * Handle deleting a collection from the list
    */
   public async onCollectionRemoveUsername(username: string, collection: Collection) {
     const member = await this.getListMember(username);
@@ -109,13 +108,13 @@ export class TwitterList extends ConfigListener<ListConfig> {
     const noCollectionSubscribed = collectionSubscribedToAccount.length === 0;
 
     if (noCollectionSubscribed) {
-      // remove user from list
+      // Remove user from list
       await this.removeMember(member);
     }
   }
 
   /**
-   * remove a member from the twitter list
+   * Remove a member from the twitter list
    */
   private async removeMember(member: ListMember) {
     const { isUserMember } = await this._botAccount.client.removeListMember(member.listId, member.userId);
@@ -133,14 +132,14 @@ export class TwitterList extends ConfigListener<ListConfig> {
   }
 
   /**
-   * add member to the twitter list
+   * Add member to the twitter list
    */
   private async addMember(username: string): Promise<ListMember> {
     const listId = this.config.id;
     const member = await this.getListMember(username);
 
     if (member.listId === this.config.id && member.listOwnerId === this._botAccount.config.username) {
-      // user is already part of this list
+      // User is already part of this list
       return member;
     } else if (member.listId && member.listOwnerId) {
       throw new Error('Attempted to add user to list that is already part of another list');
@@ -159,7 +158,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
     member.listId = listId;
     member.listOwnerId = this._botAccount.config.username;
 
-    // add user to listMembers collection
+    // Add user to listMembers collection
     const batch = firestore.batch();
     batch.set(TwitterList.getMemberRef(member.userId), member);
     batch.update(this._docRef, {
@@ -172,7 +171,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
   }
 
   /**
-   * get a list member object by username
+   * Get a list member object by username
    *
    * initializes the member if it doesn't exist
    */
@@ -180,7 +179,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
     const userSnap = await TwitterList.allMembersRef.where('username', '==', username).get();
     const existingUser = userSnap?.docs?.[0]?.data() as ListMember | undefined;
     if (existingUser?.username) {
-      return existingUser as ListMember;
+      return existingUser;
     }
 
     const response = await this._botAccount.client.getUser(username);

@@ -3,10 +3,10 @@ import { startServices } from './services';
 import { writer as write } from './writer';
 import { firestore } from './container';
 
-// load environment vars
+// Load environment vars
 loadEnv();
 
-main();
+void main();
 
 async function main() {
   await startServices((event) => write(event, firestore));

@@ -1,11 +1,10 @@
-import firebaseAdmin from 'firebase-admin';
+import firebaseAdmin, { ServiceAccount } from 'firebase-admin';
 
 /**
  * Creates a new connection to the database and returns the instance (if successful).
  */
-export function initDb(serviceAccount: any) {
+export function initDb(serviceAccount: ServiceAccount) {
   firebaseAdmin.initializeApp({
-    // @ts-ignore
     credential: firebaseAdmin.credential.cert(serviceAccount)
   });
 

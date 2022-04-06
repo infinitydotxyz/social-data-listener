@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import chalk from 'chalk';
 import express from 'express';
 import { TwitterApi } from 'twitter-api-v2';
-import { v1 } from 'uuid';
 import { socialDataFirestoreConstants } from '../constants';
 import { firestore } from '../container';
 import { BotAccountConfig } from '../services/twitter/twitter.types';
@@ -12,7 +12,7 @@ const info = (message?: any, ...optionalParams: any[]) => console.log(chalk.blue
 const warn = (message?: any, ...optionalParams: any[]) => console.log(chalk.yellow(message, ...optionalParams, '\n'));
 
 /**
- * env variables
+ * Env variables
  * TWITTER_API_KEY
  * TWITTER_API_KEY_SECRET
  * TWITTER_CLIENT_ID
@@ -33,7 +33,7 @@ type V1Callback = (
   creds: Pick<BotAccountConfig, 'id' | 'username' | 'apiKey' | 'apiKeySecret' | 'accessTokenV1' | 'accessSecretV1'>
 ) => void;
 let v1CredsCallback: V1Callback;
-let v1Creds = new Promise((resolve: V1Callback, reject) => {
+const v1Creds = new Promise((resolve: V1Callback) => {
   v1CredsCallback = resolve;
 });
 const v1Client = new TwitterApi({ appKey: CONSUMER_KEY, appSecret: CONSUMER_SECRET });
@@ -45,7 +45,7 @@ type V2Callback = (
   >
 ) => void;
 let v2CredsCallback: V2Callback;
-let v2Creds = new Promise((resolve: V2Callback, reject) => {
+const v2Creds = new Promise((resolve: V2Callback) => {
   v2CredsCallback = resolve;
 });
 const v2Client = new TwitterApi({
@@ -53,21 +53,19 @@ const v2Client = new TwitterApi({
   clientSecret
 });
 
-let authToken = '';
 let authTokenSecret = '';
 let codeVerifier = '';
 let sessionState = '';
 
 async function createAccount() {
   /**
-   * v1 oauth
+   * V1 oauth
    */
   const authLink = await v1Client.generateAuthLink(v1CallbackUrl.toString(), {
     authAccessType: 'write'
   });
   info(`Click this link to authenticate the application for v1 endpoints`);
   warn(authLink.url);
-  authToken = authLink.oauth_token;
   authTokenSecret = authLink.oauth_token_secret;
 
   info(`Waiting for v1 creds...`);
@@ -80,7 +78,7 @@ async function createAccount() {
   }
 
   /**
-   * v2 oauth
+   * V2 oauth
    */
   const v2AuthLink = v2Client.generateOAuth2AuthLink(v2CallbackUrl.toString(), {
     scope: ['list.read', 'list.write', 'tweet.read', 'users.read', 'offline.access']
@@ -150,7 +148,7 @@ app.get(v1CallbackUrl.pathname, async (req, res) => {
     appKey: CONSUMER_KEY,
     appSecret: CONSUMER_SECRET,
     accessToken: oauth_token as string,
-    accessSecret: authTokenSecret as string
+    accessSecret: authTokenSecret
   });
 
   info('Logging in...');
@@ -165,7 +163,7 @@ app.get(v1CallbackUrl.pathname, async (req, res) => {
       id,
       apiKey: CONSUMER_KEY,
       apiKeySecret: CONSUMER_SECRET,
-      accessTokenV1: accessToken as string,
+      accessTokenV1: accessToken,
       accessSecretV1: accessSecret
     });
     res.status(200).send('success');
@@ -175,13 +173,16 @@ app.get(v1CallbackUrl.pathname, async (req, res) => {
 });
 
 app.get(v2CallbackUrl.pathname, async (req, res) => {
-  // extract state and code from query params
+  // Extract state and code from query params
   const { state, code } = req.query;
 
-  // verify
-  if (!codeVerifier || !sessionState || !state || !code)
+  // Verify
+  if (!codeVerifier || !sessionState || !state || !code) {
     return res.status(400).send('You denied the app or your session expired!');
-  if (state !== sessionState) return res.status(400).send("Stored tokens didn't match!");
+  }
+  if (state !== sessionState) {
+    return res.status(400).send("Stored tokens didn't match!");
+  }
 
   try {
     const { client, accessToken, refreshToken, expiresIn } = await v2Client.loginWithOAuth2({
@@ -197,7 +198,7 @@ app.get(v2CallbackUrl.pathname, async (req, res) => {
       username: data.username,
       clientId,
       clientSecret,
-      accessTokenV2: accessToken as string,
+      accessTokenV2: accessToken,
       refreshTokenV2: refreshToken as string,
       refreshTokenValidUntil: Date.now() + expiresIn * 1000
     });
@@ -210,5 +211,5 @@ app.get(v2CallbackUrl.pathname, async (req, res) => {
 
 app.listen(BASE_CALLBACK_URL.port, () => {
   success(`Listening on ${BASE_CALLBACK_URL.host} for callback to ${BASE_CALLBACK_URL.pathname}`);
-  createAccount();
+  void createAccount();
 });

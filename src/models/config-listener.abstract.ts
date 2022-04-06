@@ -10,7 +10,7 @@ export abstract class ConfigListener<T> extends DocListener<T> {
   constructor(initialValue: T, docRef: FirebaseFirestore.DocumentReference<T>) {
     super(docRef);
     this._config = initialValue;
-    this._registerListener();
+    void this._registerListener();
     this._listen();
   }
 

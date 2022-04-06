@@ -6,7 +6,6 @@ import { TwitterList } from './twitter-list';
 import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
 import chalk from 'chalk';
-import { v4 } from 'uuid';
 import Emittery from 'emittery';
 
 export class BotAccountManager extends Emittery<{ tweet: any }> {
@@ -155,7 +154,7 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
               await botAccount.isReady;
             }
             console.log(chalk.green(`Loaded: ${this._botAccounts.size} bot accounts`));
-            resolve(); // resolve once we have added at least one bot account
+            resolve(); // Resolve once we have added at least one bot account
             resolved = true;
           }
         });

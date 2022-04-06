@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 import Listener, { OnEvent } from '../listener';
 import { CoinMarketCapNewsEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { CoinMarketCapConfig } from './config';
@@ -19,9 +20,9 @@ export class CoinMarketCap extends Listener<CoinMarketCapNewsEvent> {
 
   async setup() {}
 
-  async monitor(handler: OnEvent<CoinMarketCapNewsEvent>) {
-    // executes the job every hour (CMC seems to update their articles every hour as well so)
-    // see: https://github.com/node-schedule/node-schedule#cron-style-scheduling
+  monitor(handler: OnEvent<CoinMarketCapNewsEvent>) {
+    // Executes the job every hour (CMC seems to update their articles every hour as well so)
+    // See: https://github.com/node-schedule/node-schedule#cron-style-scheduling
     // TODO: check which timezone CMC is using
     const job = schedule.scheduleJob(FeedEventType.CoinMarketCapNews, '0 * * * *', async () => {
       const res = await phin({
@@ -61,7 +62,7 @@ export class CoinMarketCap extends Listener<CoinMarketCapNewsEvent> {
         }
 
         for (const newsItem of newsItems) {
-          handler({
+          void handler({
             ...newsItem.meta,
             id: newsItem.slug,
             comments: 0,
