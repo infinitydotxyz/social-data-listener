@@ -78,7 +78,7 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
     let botAccountMinMembers = Number.MAX_SAFE_INTEGER;
 
     for (const [, botAccount] of this._botAccounts) {
-      const botAccountMembers = botAccount.getListsMembers();
+      const botAccountMembers = botAccount.getNumListsMembers();
       if (botAccountMembers < botAccountMinMembers) {
         minBotAccount = botAccount;
         botAccountMinMembers = botAccountMembers;

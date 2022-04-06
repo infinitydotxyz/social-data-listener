@@ -25,9 +25,7 @@ export type TwitterOptions = {
 /**
  * TODO validate that we don't have extra/missing members/collections
  * TODO monitor list tweets and save to db
- * TODO think about what happens if a username changes but user id stays the same
  */
-
 export class Twitter extends Listener<TwitterTweetEvent> {
   private api: TwitterApi;
   private options: TwitterOptions;
@@ -41,71 +39,59 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   async setup(): Promise<void> {
     const twitterConfig = await this.getTwitterConfig();
     const debug = true;
-    // Const botAccountManager = new BotAccountManager(twitterConfig, debug);
+    const botAccountManager = new BotAccountManager(twitterConfig, debug);
 
-    // Const bayc = {
-    //   Address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
-    //   ChainId: '1'
-    // };
+    const bayc = {
+      address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
+      chainId: '1'
+    };
+    const azuki = {
+      address: '0xed5af388653567af2f388e6224dc7c4b3241c544',
+      chainId: '1'
+    };
+    const mayc = {
+      address: '0x60e4d786628fea6478f785a6d7e704777c86a7c6',
+      chainId: '1'
+    };
 
-    // BotAccountManager.on('tweet', (tweet: any) => {
-    //   Console.log(tweet);
-    // });
-    const twitterConfigRef = firestore
-      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
-      .doc(socialDataFirestoreConstants.TWITTER_DOC);
+    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
-    const botAccountConfigRef = twitterConfigRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL).doc('ll0_0lj');
+    query.onSnapshot((snapshot) => {
+      const changes = snapshot.docChanges().slice(0, 250);
+      console.log(`Received: ${changes.length} collections`);
 
-    const snap = await botAccountConfigRef.get();
-    const config = snap.data() as BotAccountConfig;
-    const botAccount = new BotAccount(config, twitterConfig, true);
-    await botAccount.isReady;
+      for (const change of changes) {
+        // Skip collections w/o twitter url
+        const collectionData = change.doc.data() as Partial<Collection>;
+        const url = collectionData.metadata?.links?.twitter;
+        if (!url || !collectionData.address || !collectionData.chainId) {
+          continue;
+        }
 
-    const res = await botAccount.client.addListMembers('1511176754248957955', ['jfrazier_eth']);
-    console.log(res);
+        // Skip invalid handles
+        const handle = Twitter.extractHandle(url).trim();
+        if (!handle) {
+          continue;
+        }
 
-    // Client.addListMembers('1511176754248957955', ['jfrazier_eth'])
-
-    // Await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
-    // Await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
-    // Await botAccountManager.unsubscribeCollectionFromUser('jfrazier_eth', bayc);
-    // Await botAccountManager.subscribeCollectionToUser('jfrazier_eth', bayc);
-
-    // Const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
-
-    // Query.onSnapshot(async (snapshot) => {
-    //   Const changes = snapshot.docChanges();
-    //   Console.log(`Received: ${changes.length} collections`);
-
-    //   For (const change of changes) {
-    //     // skip collections w/o twitter url
-    //     Const collectionData = change.doc.data() as Partial<Collection>;
-    //     Const url = collectionData.metadata?.links?.twitter;
-    //     If (!url || !collectionData.address || !collectionData.chainId) continue;
-
-    //     // skip invalid handles
-    //     Const handle = Twitter.extractHandle(url).trim();
-    //     If (!handle) continue;
-
-    //     Switch (change.type) {
-    //       Case 'added':
-    //       Case 'modified':
-    //         // TODO: delete old account from the list when the twitter link is modified?
-    //         BotAccountManager.subscribeCollectionToUser(handle, {
-    //           ChainId: collectionData.chainId,
-    //           Address: collectionData.address
-    //         });
-    //         Break;
-    //       Case 'removed':
-    //         BotAccountManager.unsubscribeCollectionFromUser(handle, {
-    //           ChainId: collectionData.chainId,
-    //           Address: collectionData.address
-    //         });
-    //         Break;
-    //     }
-    //   }
-    // });
+        switch (change.type) {
+          case 'added':
+          case 'modified':
+            // TODO: delete old account from the list when the twitter link is modified?
+            void botAccountManager.subscribeCollectionToUser(handle, {
+              chainId: collectionData.chainId,
+              address: collectionData.address
+            });
+            break;
+          case 'removed':
+            void botAccountManager.unsubscribeCollectionFromUser(handle, {
+              chainId: collectionData.chainId,
+              address: collectionData.address
+            });
+            break;
+        }
+      }
+    });
   }
 
   private async getTwitterConfig() {

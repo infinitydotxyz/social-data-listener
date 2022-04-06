@@ -47,7 +47,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     }
   }
 
-  public getListsMembers() {
+  public getNumListsMembers() {
     let sum = 0;
     for (const [, list] of this._lists) {
       sum += list.size;

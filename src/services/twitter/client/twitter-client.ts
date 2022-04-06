@@ -17,7 +17,8 @@ enum TwitterEndpoint {
   CreateList = 'create-list',
   RemoveMemberFromList = 'remove-member-from-list',
   AddMemberToList = 'add-member-to-list',
-  GetListTweets = 'get-list-tweets'
+  GetListTweets = 'get-list-tweets',
+  BatchedAddMembersToList = 'batched-add-members-to-list'
 }
 
 interface Endpoint {
@@ -110,31 +111,29 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     };
   }
 
-  async addListMembers(listId: string, screenNames: string[]): Promise<any> {
+  async addListMembers(listId: string, userIds: string[]): Promise<any> {
     const url = new URL('https://api.twitter.com/1.1/lists/members/create_all.json');
     url.searchParams.set('list_id', listId);
-    url.searchParams.set('user_id', screenNames.join(','));
+    url.searchParams.set('user_id', userIds.join(','));
 
-    const request: OAuth1RequestOptions = {
-      method: 'POST',
-      url: url.toString(),
-      data: {}
-    };
+    const response = await this.requestHandler<any>(async () => {
+      const request: OAuth1RequestOptions = {
+        method: 'POST',
+        url: url.toString(),
+        data: {}
+      };
+      const authHelper = new V1AuthHelper(this.config);
+      const authHeaders = authHelper.getAuthHeader(this.config, request);
+      const response = await phin({
+        ...request,
+        headers: {
+          ...authHeaders
+        }
+      });
+      return response;
+    }, TwitterEndpoint.BatchedAddMembersToList);
 
-    const authHelper = new V1AuthHelper(this.config);
-    const authHeaders = authHelper.getAuthHeader(this.config, request);
-    console.log(authHeaders);
-
-    const response = await phin({
-      ...request,
-      headers: {
-        ...authHeaders
-      }
-    });
-    console.log(response.statusCode);
-    console.log(response.statusMessage);
-    const body = response.body.toString();
-    console.log(body);
+    return response;
   }
 
   /**
@@ -191,7 +190,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
   public async getListTweets(listId: string, cursor: string) {
     // 900 per 15 min
-    const response = await this.requestHandler<BasicResponse<any>>(() => {
+    const response = await this.requestHandler<any>(() => {
       const url = new URL(`https://api.twitter.com/2/lists/${listId}/tweets`);
       const params = new URLSearchParams({
         expansions: 'author_id,attachments.media_keys',

@@ -33,22 +33,31 @@ export class TwitterList extends ConfigListener<ListConfig> {
     private _onTweet: (tweet: Tweet) => void
   ) {
     super(config, TwitterList.ref(_botAccount, config.id));
-    void this.monitorTweets();
+    this.monitorTweets();
   }
 
-  private async monitorTweets() {
-    await this.getTweets();
+  private monitorTweets() {
+    setInterval(async () => {
+      try {
+        console.log(`Getting list tweets`);
+        await this.getTweets();
+      } catch (err) {
+        console.error('Failed to get tweets', err);
+      }
+    }, 60_000);
   }
 
   private async getTweets() {
-    // Const response = await this._botAccount.client.getListTweets(this.config.id, ''); // TODO add cursor
-    // Const tweets = response.data;
-    // Const media = response.includes.media;
-    // Const users = response.includes.users;
-    // Const meta = response.includes.meta;
-    // Const results = meta.results_count;
-    // Const cursor = meta.next_token;
-    // Console.log(response);
+    const response = await this._botAccount.client.getListTweets(this.config.id, ''); // TODO add cursor
+    console.log(Date.now());
+    console.log(JSON.stringify(response, null, 2));
+    // const tweets = response.data;
+    // const media = response.includes.media;
+    // const users = response.includes.users;
+    // const meta = response.includes.meta;
+    // const results = meta.results_count;
+    // const cursor = meta.next_token;
+    // console.log(response);
     /**
      * TODO handle tweets
      */
@@ -64,7 +73,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
    * Returns the number of members in the list
    */
   public get size() {
-    return this.config.numMembers;
+    return this.config.numMembers + this.pendingMembers.length;
   }
 
   public getCollectionKey(collection: Collection) {
@@ -78,16 +87,18 @@ export class TwitterList extends ConfigListener<ListConfig> {
     const member = await this.addMember(username);
 
     // Add collection to user
-    await TwitterList.getMemberRef(member.userId).update({
-      collections: {
-        ...member.collections,
-        [this.getCollectionKey(collection)]: {
-          chainId: collection.chainId,
-          address: trimLowerCase(collection.address),
-          addedAt: Date.now()
+    await TwitterList.getMemberRef(member.userId).set(
+      {
+        collections: {
+          [`${this.getCollectionKey(collection)}`]: {
+            chainId: collection.chainId,
+            address: trimLowerCase(collection.address),
+            addedAt: Date.now()
+          }
         }
-      }
-    });
+      },
+      { mergeFields: [`collections.${this.getCollectionKey(collection)}`] }
+    );
   }
 
   /**
@@ -134,6 +145,9 @@ export class TwitterList extends ConfigListener<ListConfig> {
   /**
    * Add member to the twitter list
    */
+  private pendingMembers: ListMember[] = [];
+  private debouncedTimeout?: NodeJS.Timeout;
+  private debouncedPromise?: Promise<void>;
   private async addMember(username: string): Promise<ListMember> {
     const listId = this.config.id;
     const member = await this.getListMember(username);
@@ -149,23 +163,40 @@ export class TwitterList extends ConfigListener<ListConfig> {
       throw new Error('List is full');
     }
 
-    const { isUserMember } = await this._botAccount.client.addListMember(listId, member.userId);
+    if (!this.debouncedTimeout) {
+      this.debouncedPromise = new Promise((resolve, reject) => {
+        this.debouncedTimeout = setTimeout(async () => {
+          this.debouncedTimeout = undefined;
+          const firstOneHundred = this.pendingMembers.splice(0, 100); // Remove the first 100 members from the pending list
+          const pendingMembersCopy = firstOneHundred;
+          try {
+            const userIds = pendingMembersCopy.map((item) => item.userId);
+            await this._botAccount.client.addListMembers(this.config.id, userIds);
+            console.log(`Added: ${pendingMembersCopy.length} members to list: ${this.config.id}`);
 
-    if (!isUserMember) {
-      throw new Error(`Failed to add user: ${member.userId} to list: ${listId}`);
+            // Add user to listMembers collection
+            const batch = firestore.batch();
+            for (const member of pendingMembersCopy) {
+              member.listId = listId;
+              member.listOwnerId = this._botAccount.config.username;
+              batch.set(TwitterList.getMemberRef(member.userId), member);
+            }
+
+            batch.update(this._docRef, {
+              numMembers: firebaseAdmin.firestore.FieldValue.increment(pendingMembersCopy.length)
+            });
+
+            await batch.commit();
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        }, 60_000);
+      });
     }
 
-    member.listId = listId;
-    member.listOwnerId = this._botAccount.config.username;
-
-    // Add user to listMembers collection
-    const batch = firestore.batch();
-    batch.set(TwitterList.getMemberRef(member.userId), member);
-    batch.update(this._docRef, {
-      numMembers: firebaseAdmin.firestore.FieldValue.increment(1)
-    });
-
-    await batch.commit();
+    this.pendingMembers.push(member);
+    await this.debouncedPromise;
 
     return member;
   }
@@ -185,7 +216,6 @@ export class TwitterList extends ConfigListener<ListConfig> {
     const response = await this._botAccount.client.getUser(username);
 
     if (!response?.id) {
-      console.log(response);
       throw new Error('Failed to get user id');
     }
 
