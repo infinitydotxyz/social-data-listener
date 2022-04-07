@@ -21,7 +21,7 @@ const warn = (message?: any, ...optionalParams: any[]) => console.log(chalk.yell
 
 const CONSUMER_KEY = process.env.TWITTER_API_KEY!;
 const CONSUMER_SECRET = process.env.TWITTER_API_KEY_SECRET!;
-const BASE_CALLBACK_URL = new URL('http://127.0.0.1:7777/callback'!);
+const BASE_CALLBACK_URL = new URL('http://127.0.0.1:7777/callback');
 
 const clientId = process.env.TWITTER_CLIENT_ID!;
 const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
@@ -168,7 +168,14 @@ app.get(v1CallbackUrl.pathname, async (req, res) => {
     });
     res.status(200).send('success');
   } catch (err) {
-    res.status(403).send('Invalid verifier or access tokens!');
+    console.log(err);
+    console.log((err as any)?.data?.errors);
+    if ((err as any)?.data?.errors[0]?.code === 453) {
+      error(`Requires Elevated Access!`);
+      res.status(403).send('This app requires elevated access!');
+    } else {
+      res.status(403).send('Invalid verifier or access tokens!');
+    }
   }
 });
 

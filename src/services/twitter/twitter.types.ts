@@ -8,6 +8,11 @@ export interface TwitterConfig {
    * The max number of accounts that can be members of a list
    */
   maxMembersPerList: number;
+
+  /**
+   * The default tweet poll interval in ms
+   */
+  defaultTweetPollInterval: number;
 }
 
 export interface BotAccountConfig {
@@ -44,8 +49,9 @@ export interface ListConfig {
   id: string;
   name: string;
   numMembers: number;
-  cursor?: string;
-  totalTweets?: number;
+  tweetPollInterval: number;
+  mostRecentTweetId: string;
+  totalTweets: number;
 }
 
 export interface CreateListResponseData {
@@ -117,4 +123,54 @@ export interface ListMember {
   listId: string;
   listOwnerId: string;
   collections: Record<string, ListMemberCollection>;
+}
+
+export interface TwitterUser {
+  id: string;
+  location: string;
+  verified: boolean;
+  username: string;
+  name: string;
+  profile_image_url: string;
+}
+
+export interface Tweet {
+  text: string;
+  attachments: TweetAttachments;
+  id: string;
+  possibly_sensitive: boolean;
+  source: string;
+  author_id: string;
+  lang: string;
+  /**
+   * "2022-03-27T20:19:03.000Z"
+   */
+  createdAt: string;
+}
+
+export interface TweetAttachments {
+  /**
+   * Id of the media item
+   */
+  media_keys: string[];
+}
+
+export interface TweetMedia {
+  width: number;
+  preview_image_url: string;
+  type: 'video' | 'photo' | 'animated_gif';
+  media_key: string;
+  height: number;
+}
+
+export interface ListTweetsResponse {
+  data: Tweet[];
+  includes: {
+    users: TwitterUser[];
+    media: TweetMedia[];
+  };
+  meta: {
+    result_count: number;
+    next_token?: string;
+  };
 }

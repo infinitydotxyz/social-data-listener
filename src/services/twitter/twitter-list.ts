@@ -1,14 +1,15 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { BotAccount } from './bot-account';
-import { ListConfig, Collection, ListMember } from './twitter.types';
-import { trimLowerCase } from '@infinityxyz/lib/utils';
+import { ListConfig, Collection, ListMember, TwitterUser, TweetMedia } from './twitter.types';
+import { sleep, trimLowerCase } from '@infinityxyz/lib/utils';
 import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
-import { TwitterConfig } from './twitter-config';
+import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 
 export type Tweet = any;
-export class TwitterList extends ConfigListener<ListConfig> {
+
+export class TwitterList extends ConfigListener<ListConfig, { docSnapshot: ListConfig; tweetEvent: TwitterTweetEvent }> {
   static ref(botAccount: BotAccount, listId: string): FirebaseFirestore.DocumentReference<ListConfig> {
     const botAccountRef = BotAccount.ref(botAccount.config.username);
     const listRef = botAccountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(listId);
@@ -26,14 +27,9 @@ export class TwitterList extends ConfigListener<ListConfig> {
     return this.allMembersRef.doc(userId) as FirebaseFirestore.DocumentReference<ListMember>;
   }
 
-  constructor(
-    config: ListConfig,
-    private _botAccount: BotAccount,
-    private _twitterConfig: TwitterConfig,
-    private _onTweet: (tweet: Tweet) => void
-  ) {
+  constructor(config: ListConfig, private _botAccount: BotAccount) {
     super(config, TwitterList.ref(_botAccount, config.id));
-    this.monitorTweets();
+    void this.processTweets();
   }
 
   /**
@@ -73,194 +69,85 @@ export class TwitterList extends ConfigListener<ListConfig> {
     await batch.commit();
   }
 
-  private monitorTweets() {
-    setInterval(async () => {
+  private async processTweets() {
+    for (;;) {
       try {
-        console.log(`Getting list tweets`);
-        await this.getTweets();
+        await this.getNewTweets();
       } catch (err) {
         console.error('Failed to get tweets', err);
       }
-    }, 60_000);
+      await sleep(this.config.tweetPollInterval);
+    }
   }
 
-  private async getTweets() {
-    const response = await this._botAccount.client.getListTweets(this.config.id, ''); // TODO add cursor
-    console.log(Date.now());
-    console.log(JSON.stringify(response, null, 2));
-    // Const tweets = response.data;
-    // Const media = response.includes.media;
-    // Const users = response.includes.users;
-    // Const meta = response.includes.meta;
-    // Const results = meta.results_count;
-    // Const cursor = meta.next_token;
-    // Console.log(response);
-    /**
-     * TODO handle tweets
-     */
-    // Const batch = firestore.batch();
-    // Batch.update(this._docRef, {
-    //   NumTweets: firebaseAdmin.firestore.FieldValue.increment(results),
-    //   Cursor: cursor,
-    // });
-    // Await batch.commit();
+  private async getNewTweets() {
+    const mostRecentTweetId = this.config.mostRecentTweetId;
+    let newMostRecentTweetId = '';
+    let shouldGetNextPage = true;
+    let page = 0;
+    const MAX_PAGES = 8; // Api is limited to 8 pages
+    let cursor = '';
+    while (shouldGetNextPage && page < MAX_PAGES) {
+      page += 1;
+      const response = await this._botAccount.client.getListTweets(this.config.id, cursor);
+      const tweets: Tweet[] = response?.data ?? [];
+      const users: TwitterUser[] = response?.includes?.users ?? [];
+      const usersMap = users.reduce(
+        (acc: Record<string, TwitterUser>, user: TwitterUser) => ({
+          ...acc,
+          [user.id]: user
+        }),
+        {}
+      );
+
+      const media: TweetMedia[] = response?.includes?.media ?? [];
+      const mediaMap = media.reduce(
+        (acc: Record<string, TweetMedia>, media: TweetMedia) => ({
+          ...acc,
+          [media.media_key]: media
+        }),
+        {}
+      );
+
+      const meta = response?.meta;
+
+      if (!cursor) {
+        newMostRecentTweetId = tweets[0]?.id ?? '';
+      }
+
+      for (const tweet of tweets) {
+        if (tweet.id === mostRecentTweetId) {
+          shouldGetNextPage = false;
+          break;
+        }
+        if (tweet.text.startsWith('RT @')) {
+          // Ignore retweets
+          continue;
+        }
+
+        const event: TwitterTweetEvent = {
+          type: FeedEventType.TwitterTweet,
+          id: tweet.id,
+          authorId: tweet.author_id,
+          text: tweet.text,
+          source: tweet.source,
+          image: mediaMap?.[tweet.media_key]?.preview_image_url ?? '',
+          language: tweet.lang,
+          isSensitive: tweet.possibly_sensitive,
+          username: usersMap?.[tweet.author_id]?.username ?? '',
+          likes: 0,
+          comments: 0,
+          timestamp: new Date(tweet.created_at).getTime()
+        };
+        void this.emit('tweetEvent', event);
+      }
+
+      cursor = meta?.next_token ?? '';
+
+      if (!cursor || !mostRecentTweetId) {
+        shouldGetNextPage = false;
+      }
+    }
+    await this._docRef.update({ mostRecentTweetId: newMostRecentTweetId });
   }
-
-  // /**
-  //  * Handle deleting a collection from the list
-  //  */
-  // public async onCollectionRemoveUsername(username: string, collection: Collection) {
-  //   const member = await this.getListMember(username);
-
-  //   if (member.listId !== this.config.id || member.listOwnerId !== this._botAccount.config.username) {
-  //     throw new Error('Attempted to remove user from list that is not part of this list');
-  //   }
-
-  //   const key = this.getCollectionKey(collection);
-  //   if (member.collections[key]) {
-  //     delete member.collections[key];
-  //   }
-  //   const collectionSubscribedToAccount = Object.keys(member.collections);
-  //   const noCollectionSubscribed = collectionSubscribedToAccount.length === 0;
-
-  //   if (noCollectionSubscribed) {
-  //     // Remove user from list
-  //     await this.removeMember(member);
-  //   }
-  // }
-
-  // /**
-  //  * Remove a member from the twitter list
-  //  */
-  // private async removeMember(member: ListMember) {
-  //   const { isUserMember } = await this._botAccount.client.removeListMember(member.listId, member.userId);
-
-  //   if (isUserMember) {
-  //     throw new Error(`Failed to remove user: ${member.userId} from list: ${member.listId}`);
-  //   }
-
-  //   const batch = firestore.batch();
-  //   batch.delete(TwitterList.getMemberRef(member.userId));
-  //   batch.update(this._docRef, {
-  //     numMembers: firebaseAdmin.firestore.FieldValue.increment(-1)
-  //   });
-  //   await batch.commit();
-  // }
-
-  // /**
-  //  * Add member to the twitter list
-  //  */
-  // private async addMember(username: string): Promise<ListMember> {
-  //   const member = await this.getListMember(username);
-
-  //   if (member.listId === this.config.id && member.listOwnerId === this._botAccount.config.username) {
-  //     // User is already part of this list
-  //     return member;
-  //   } else if (member.listId && member.listOwnerId) {
-  //     throw new Error('Attempted to add user to list that is already part of another list');
-  //   }
-
-  //   const updatedMember = await this._addMemberDebouncer.enqueue(member.userId, member);
-
-  //   return updatedMember;
-  // }
-
-  //   If (this.config.numMembers + 1 > this._twitterConfig.config.maxMembersPerList) {
-  //     Throw new Error('List is full');
-  //   }
-
-  //   If (!this.debouncedTimeout) {
-  //     This.debouncedPromise = new Promise((resolve, reject) => {
-  //       This.debouncedTimeout = setTimeout(async () => {
-  //         This.debouncedTimeout = undefined;
-  //         Const firstOneHundred = this.pendingMembers.splice(0, 100); // Remove the first 100 members from the pending list
-  //         Const pendingMembersCopy = firstOneHundred;
-  //         Try {
-  //           Const userIds = pendingMembersCopy.map((item) => item.userId);
-  //           Await this._botAccount.client.addListMembers(this.config.id, userIds);
-  //           Console.log(`Added: ${pendingMembersCopy.length} members to list: ${this.config.id}`);
-
-  //           // Add user to listMembers collection
-  //           Const batch = firestore.batch();
-  //           For (const member of pendingMembersCopy) {
-  //             Member.listId = listId;
-  //             Member.listOwnerId = this._botAccount.config.username;
-  //             Batch.set(TwitterList.getMemberRef(member.userId), member);
-  //           }
-
-  //           Batch.update(this._docRef, {
-  //             NumMembers: firebaseAdmin.firestore.FieldValue.increment(pendingMembersCopy.length)
-  //           });
-
-  //           Await batch.commit();
-  //           Resolve();
-  //         } catch (err) {
-  //           Reject(err);
-  //         }
-  //       }, 60_000);
-  //     });
-  //   }
-
-  //   This.pendingMembers.push(member);
-  //   Await this.debouncedPromise;
-
-  //   Return member;
-  // }
-
-  // private getAddMemberDebouncer() {
-  //   type HandlerReturn = Array<{ id: string; output: ListMember } | { id: string; error: Error }>;
-  //   const handler = async (inputs: { id: string; value: ListMember }[]): Promise<HandlerReturn> => {
-  //     const screenNames = inputs.map((item) => item.value.username);
-  //     await this._botAccount.client.addListMembers(this.config.id, screenNames);
-  //     console.log(`Added: ${screenNames.length} members to list: ${this.config.id}`);
-
-  //     // Add user to listMembers collection
-  //     const batch = firestore.batch();
-  //     for (const input of inputs) {
-  //       input.value.listId = this.config.id;
-  //       input.value.listOwnerId = this._botAccount.config.username;
-  //       batch.set(TwitterList.getMemberRef(input.value.userId), input.value, { merge: true });
-  //     }
-
-  //     batch.update(this._docRef, {
-  //       numMembers: firebaseAdmin.firestore.FieldValue.increment(inputs.length)
-  //     });
-
-  //     await batch.commit();
-
-  //     return inputs.map((item) => ({ id: item.id, output: item.value }));
-  //   };
-
-  //   const debouncer = new BatchDebouncer({ timeout: 60_000, maxBatchSize: 100 }, handler);
-  //   return debouncer;
-  // }
-
-  // /**
-  //  * Get a list member object by username
-  //  *
-  //  * initializes the member if it doesn't exist
-  //  */
-  // private async getListMember(username: string): Promise<ListMember> {
-  //   const userSnap = await TwitterList.allMembersRef.where('username', '==', username).get();
-  //   const existingUser = userSnap?.docs?.[0]?.data() as ListMember | undefined;
-  //   if (existingUser?.username) {
-  //     return existingUser;
-  //   }
-
-  //   const response = await this._botAccount.getUser(username);
-
-  //   if (!response?.id) {
-  //     throw new Error('Failed to get user id');
-  //   }
-
-  //   const newUser: ListMember = {
-  //     userId: response.id,
-  //     username,
-  //     listId: '',
-  //     listOwnerId: '',
-  //     collections: {}
-  //   };
-
-  //   return newUser;
-  // }
 }

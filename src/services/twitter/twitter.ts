@@ -37,6 +37,10 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     const debug = true;
     const botAccountManager = new BotAccountManager(twitterConfig, listAccountQueue, debug);
 
+    botAccountManager.on('tweetEvent', ({ tweet, listId, botAccountId }) => {
+      console.log(`Received new Tweet from ${botAccountId} in list ${listId}. \nTweet: ${tweet.text}`);
+    });
+
     const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
     query.onSnapshot((snapshot) => {

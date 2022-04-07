@@ -1,6 +1,6 @@
 import DocListener from './doc-listener.abstract';
 
-export abstract class ConfigListener<T> extends DocListener<T> {
+export abstract class ConfigListener<T, EventData extends { docSnapshot: T }> extends DocListener<T, EventData> {
   private _config: T;
 
   public get config(): T {

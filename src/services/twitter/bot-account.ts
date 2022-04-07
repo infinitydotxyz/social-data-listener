@@ -10,9 +10,13 @@ import { v4 } from 'uuid';
 import { BatchDebouncer } from '../../models/batch-debouncer';
 import ListAccountQueue from './list-account-queue';
 import { sleep } from '@infinityxyz/lib/utils';
+import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed/TwitterEvent';
 
 type HandlerReturn = ({ output: UserIdResponseData; id: string } | { id: string; error: Error })[];
-export class BotAccount extends ConfigListener<BotAccountConfig> {
+export class BotAccount extends ConfigListener<
+  BotAccountConfig,
+  { docSnapshot: BotAccountConfig; tweetEvent: { tweet: TwitterTweetEvent; botAccountId: string; listId: string } }
+> {
   static ref(botAccountUsername: string) {
     const accountRef = firestore
       .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
@@ -146,10 +150,8 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
         const changes = listConfigsSnapshot.docChanges();
         for (const change of changes) {
           if (change.type === 'added') {
-            console.log('List loaded', change.doc.id);
             const listConfig = change.doc.data() as ListConfig;
-            const list = new TwitterList(listConfig, this, this._twitterConfig, this.onTweet.bind(this));
-            this._lists.set(listConfig.id, list);
+            this.addList(listConfig);
           } else if (change.type === 'removed') {
             console.log('List removed', change.doc.id);
             this._lists.delete(change.doc.id);
@@ -163,10 +165,6 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
         }
       });
     });
-  }
-
-  private onTweet(tweet: any) {
-    console.log('tweet', tweet); // TODO emit tweet
   }
 
   /**
@@ -187,7 +185,10 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
       listConfig = {
         id: id,
         name: name,
-        numMembers: 0
+        numMembers: 0,
+        tweetPollInterval: this._twitterConfig.config.defaultTweetPollInterval,
+        mostRecentTweetId: '',
+        totalTweets: 0
       };
 
       tx.set(listRef, listConfig);
@@ -197,9 +198,27 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     if (!listConfig?.id) {
       throw new Error('Failed to create list');
     }
+    return this.addList(listConfig);
+  }
 
-    const list = new TwitterList(listConfig, this, this._twitterConfig, this.onTweet.bind(this));
-    return list;
+  private addList(listConfig: ListConfig): TwitterList {
+    const existingList = this._lists.get(listConfig.id);
+    if (existingList) {
+      return existingList;
+    }
+    console.log(`List loaded: ${listConfig.name}`);
+    const newList = new TwitterList(listConfig, this);
+    newList.on('tweetEvent', (tweetEvent) => {
+      void this.emit('tweetEvent', {
+        tweet: tweetEvent,
+        botAccountId: this.config.id,
+        listId: listConfig.id
+      });
+    });
+
+    this._lists.set(listConfig.id, newList);
+
+    return newList;
   }
 
   private async saveConfig(config: Partial<BotAccountConfig>) {

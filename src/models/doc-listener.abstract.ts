@@ -1,8 +1,8 @@
 import Emittery from 'emittery';
 
-export type DocSnapshotEmitter<T> = { docSnapshot: T };
+export type DocSnapshotEmitter<T, Extends = Record<string, any>> = Extends & { docSnapshot: T };
 
-export default abstract class DocListener<T> extends Emittery<DocSnapshotEmitter<T>> {
+export default abstract class DocListener<T, EventData extends { docSnapshot: T }> extends Emittery<EventData> {
   constructor(protected _docRef: FirebaseFirestore.DocumentReference<T>) {
     super();
   }

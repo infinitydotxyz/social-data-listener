@@ -4,7 +4,14 @@ import PQueue from 'p-queue';
 import phin from 'phin';
 import { TwitterApi } from 'twitter-api-v2';
 import { OAuth1RequestOptions } from 'twitter-api-v2/dist/client-mixins/oauth1.helper';
-import { BasicResponse, BotAccountConfig, CreateListResponseData, UserIdResponseData, UserNotFoundError } from '../twitter.types';
+import {
+  BasicResponse,
+  BotAccountConfig,
+  CreateListResponseData,
+  ListTweetsResponse,
+  UserIdResponseData,
+  UserNotFoundError
+} from '../twitter.types';
 import { V1AuthHelper } from './v1-auth-helper';
 
 const FIVE_MIN = 5 * 60 * 1000;
@@ -203,8 +210,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
   }
 
   public async getListTweets(listId: string, cursor: string) {
-    // 900 per 15 min
-    const response = await this.requestHandler<any>(() => {
+    const response = await this.requestHandler<ListTweetsResponse>(() => {
       const url = new URL(`https://api.twitter.com/2/lists/${listId}/tweets`);
       const params = new URLSearchParams({
         expansions: 'author_id,attachments.media_keys',

@@ -8,8 +8,11 @@ import chalk from 'chalk';
 import Emittery from 'emittery';
 import { trimLowerCase } from '@infinityxyz/lib/utils';
 import ListAccountQueue from './list-account-queue';
+import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed/TwitterEvent';
 
-export class BotAccountManager extends Emittery<{ tweet: any }> {
+export class BotAccountManager extends Emittery<{
+  tweetEvent: { tweet: TwitterTweetEvent; botAccountId: string; listId: string };
+}> {
   static getCollectionKey(collection: Collection) {
     return `${collection.chainId}:${trimLowerCase(collection.address)}`;
   }
@@ -26,6 +29,7 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
     await this.isReady;
 
     try {
+      // TODO get collection's current subscription and unsubscribe
       const user = await this.getUser(username);
       if (user.addedToList && user.listId && user.listOwnerId) {
         await this.subscribeCollectionToExistingUser(user as ListMember, collection);
@@ -36,33 +40,6 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
       console.error(`Failed to subscribe user: ${username} to collection: ${collection}`, err);
     }
   }
-
-  // /**
-  //  * TODO is this needed?
-  //  */
-  // public async unsubscribeCollectionFromUser(username: string, collection: Collection) {
-  //   await this.isReady;
-  //   try {
-  //     const user = await this.getUser(username);
-  //     let list: TwitterList | undefined;
-
-  //     if (!user.listId || !user.listOwnerId) {
-  //       const ref = TwitterList.getMemberRef(username);
-  //       await ref.delete();
-  //     } else {
-  //       const res = this.getListByIds(user.listOwnerId, user.listId);
-  //       list = res.list;
-
-  //       if (!list) {
-  //         throw new Error('List not found');
-  //       }
-
-  //       await list.onCollectionRemoveUsername(username, collection);
-  //     }
-  //   } catch (err) {
-  //     console.error('Failed to remove user from list', err);
-  //   }
-  // }
 
   private async subscribeCollectionToExistingUser(user: ListMember, collection: Collection) {
     const collectionKey = BotAccountManager.getCollectionKey(collection);
