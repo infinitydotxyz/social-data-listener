@@ -54,13 +54,13 @@ export class TwitterList extends ConfigListener<ListConfig> {
     const response = await this._botAccount.client.getListTweets(this.config.id, ''); // TODO add cursor
     console.log(Date.now());
     console.log(JSON.stringify(response, null, 2));
-    // const tweets = response.data;
-    // const media = response.includes.media;
-    // const users = response.includes.users;
-    // const meta = response.includes.meta;
-    // const results = meta.results_count;
-    // const cursor = meta.next_token;
-    // console.log(response);
+    // Const tweets = response.data;
+    // Const media = response.includes.media;
+    // Const users = response.includes.users;
+    // Const meta = response.includes.meta;
+    // Const results = meta.results_count;
+    // Const cursor = meta.next_token;
+    // Console.log(response);
     /**
      * TODO handle tweets
      */
@@ -163,46 +163,46 @@ export class TwitterList extends ConfigListener<ListConfig> {
     return updatedMember;
   }
 
-  //   if (this.config.numMembers + 1 > this._twitterConfig.config.maxMembersPerList) {
-  //     throw new Error('List is full');
+  //   If (this.config.numMembers + 1 > this._twitterConfig.config.maxMembersPerList) {
+  //     Throw new Error('List is full');
   //   }
 
-  //   if (!this.debouncedTimeout) {
-  //     this.debouncedPromise = new Promise((resolve, reject) => {
-  //       this.debouncedTimeout = setTimeout(async () => {
-  //         this.debouncedTimeout = undefined;
-  //         const firstOneHundred = this.pendingMembers.splice(0, 100); // Remove the first 100 members from the pending list
-  //         const pendingMembersCopy = firstOneHundred;
-  //         try {
-  //           const userIds = pendingMembersCopy.map((item) => item.userId);
-  //           await this._botAccount.client.addListMembers(this.config.id, userIds);
-  //           console.log(`Added: ${pendingMembersCopy.length} members to list: ${this.config.id}`);
+  //   If (!this.debouncedTimeout) {
+  //     This.debouncedPromise = new Promise((resolve, reject) => {
+  //       This.debouncedTimeout = setTimeout(async () => {
+  //         This.debouncedTimeout = undefined;
+  //         Const firstOneHundred = this.pendingMembers.splice(0, 100); // Remove the first 100 members from the pending list
+  //         Const pendingMembersCopy = firstOneHundred;
+  //         Try {
+  //           Const userIds = pendingMembersCopy.map((item) => item.userId);
+  //           Await this._botAccount.client.addListMembers(this.config.id, userIds);
+  //           Console.log(`Added: ${pendingMembersCopy.length} members to list: ${this.config.id}`);
 
   //           // Add user to listMembers collection
-  //           const batch = firestore.batch();
-  //           for (const member of pendingMembersCopy) {
-  //             member.listId = listId;
-  //             member.listOwnerId = this._botAccount.config.username;
-  //             batch.set(TwitterList.getMemberRef(member.userId), member);
+  //           Const batch = firestore.batch();
+  //           For (const member of pendingMembersCopy) {
+  //             Member.listId = listId;
+  //             Member.listOwnerId = this._botAccount.config.username;
+  //             Batch.set(TwitterList.getMemberRef(member.userId), member);
   //           }
 
-  //           batch.update(this._docRef, {
-  //             numMembers: firebaseAdmin.firestore.FieldValue.increment(pendingMembersCopy.length)
+  //           Batch.update(this._docRef, {
+  //             NumMembers: firebaseAdmin.firestore.FieldValue.increment(pendingMembersCopy.length)
   //           });
 
-  //           await batch.commit();
-  //           resolve();
+  //           Await batch.commit();
+  //           Resolve();
   //         } catch (err) {
-  //           reject(err);
+  //           Reject(err);
   //         }
   //       }, 60_000);
   //     });
   //   }
 
-  //   this.pendingMembers.push(member);
-  //   await this.debouncedPromise;
+  //   This.pendingMembers.push(member);
+  //   Await this.debouncedPromise;
 
-  //   return member;
+  //   Return member;
   // }
 
   private getAddMemberDebouncer() {

@@ -41,26 +41,10 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     const debug = true;
     const botAccountManager = new BotAccountManager(twitterConfig, debug);
 
-    const bayc = {
-      address: '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d',
-      chainId: '1'
-    };
-    const azuki = {
-      address: '0xed5af388653567af2f388e6224dc7c4b3241c544',
-      chainId: '1'
-    };
-    const mayc = {
-      address: '0x60e4d786628fea6478f785a6d7e704777c86a7c6',
-      chainId: '1'
-    };
-
-    const query = this.db
-      .collection(firestoreConstants.COLLECTIONS_COLL)
-      .where('state.create.step', '==', 'complete')
-      .offset(600);
+    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
     query.onSnapshot((snapshot) => {
-      const changes = snapshot.docChanges().slice(0, 250);
+      const changes = snapshot.docChanges();
       console.log(`Received: ${changes.length} collections`);
 
       for (const change of changes) {

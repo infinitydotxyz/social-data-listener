@@ -107,7 +107,13 @@ export interface ListMemberCollection extends Collection {
 export interface ListMember {
   userId: string;
   username: string;
-  addedToList: boolean;
+  /**
+   * Whether the user has been added to the list
+   * starts as queued => pending => added
+   * pending is used when the member is being added to a list
+   */
+  addedToList: 'added' | 'pending' | 'queued';
+  pendingSize?: number;
   listId: string;
   listOwnerId: string;
   collections: Record<string, ListMemberCollection>;

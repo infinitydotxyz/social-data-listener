@@ -1,15 +1,18 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { BotAccount } from './bot-account';
 import { BotAccountConfig, Collection, ListMember } from './twitter.types';
-
 import { TwitterList } from './twitter-list';
 import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
 import chalk from 'chalk';
 import Emittery from 'emittery';
-import { Twitter } from './twitter';
+import { trimLowerCase } from '@infinityxyz/lib/utils';
 
 export class BotAccountManager extends Emittery<{ tweet: any }> {
+  static getCollectionKey(collection: Collection) {
+    return `${collection.chainId}:${trimLowerCase(collection.address)}`;
+  }
+
   private _botAccounts: Map<string, BotAccount> = new Map();
 
   private isReady: Promise<void>;
@@ -20,42 +23,22 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
 
   public async subscribeCollectionToUser(username: string, collection: Collection) {
     await this.isReady;
+
     try {
       const user = await this.getUser(username);
-
-      // const prevSubscriptions = TwitterConfig.ref.collection(socialDataFirestoreConstants.TWITTER_LIST_MEMBERS_COLL).where(`collections.${collection.chainId}:${collection.address.toLowerCase()}.addedAt`, '>=', 0);
-      // const prevSubscriptionsSnap = await prevSubscriptions.get(); // TODO remove prev subscriptions
-
-      let list: TwitterList | undefined;
-      let botAccount: BotAccount | undefined;
-
-      if (user.listId && user.listOwnerId) {
-        const res = this.getListByIds(user.listOwnerId, user.listId);
-        botAccount = res.botAccount;
-        list = res.list;
+      if (user.addedToList && user.listId && user.listOwnerId) {
+        await this.subscribeCollectionToExistingUser(user as ListMember, collection);
+      } else {
+        await this.subscribeCollectionToNewUser(username, collection);
       }
-
-      if (!list) {
-        botAccount = this.getBotAccountWithMinMembers();
-        list = await botAccount?.getListWithMinMembers();
-      }
-
-      if (!botAccount) {
-        throw new Error('No bot account found');
-      } else if (!list) {
-        throw new Error('No list found');
-      }
-      // else if (!list || list.size > this.twitterConfig.config.maxMembersPerList) {
-      //   list = await botAccount.createList();
-      // }
-
-      await list.onCollectionAddUsername(username, collection);
-      console.log('Subscribed collection to user', username);
     } catch (err) {
-      console.error('Failed to add user to list', err);
+      console.error(`Failed to subscribe user: ${username} to collection: ${collection}`, err);
     }
   }
 
+  /**
+   * TODO is this needed?
+   */
   public async unsubscribeCollectionFromUser(username: string, collection: Collection) {
     await this.isReady;
     try {
@@ -72,12 +55,62 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
         if (!list) {
           throw new Error('List not found');
         }
+
         await list.onCollectionRemoveUsername(username, collection);
       }
-      console.log('Unsubscribed collection from user');
     } catch (err) {
       console.error('Failed to remove user from list', err);
     }
+  }
+
+  private async subscribeCollectionToExistingUser(user: ListMember, collection: Collection) {
+    const collectionKey = BotAccountManager.getCollectionKey(collection);
+
+    if (user.collections[collectionKey].addedAt > 0) {
+      return; // Collection is already subscribed
+    }
+
+    await TwitterList.getMemberRef(user.userId).set(
+      {
+        collections: {
+          [`${collectionKey}`]: {
+            chainId: collection.chainId,
+            address: trimLowerCase(collection.address),
+            addedAt: Date.now()
+          }
+        }
+      },
+      { mergeFields: [`collections.${collectionKey}`] }
+    );
+  }
+
+  private async subscribeCollectionToNewUser(username: string, collection: Collection): Promise<ListMember> {
+    const collectionKey = BotAccountManager.getCollectionKey(collection);
+    const botAccount = this.getBotAccountWithMinMembers();
+    const user = await botAccount?.getUser(username);
+
+    if (!user?.id) {
+      throw new Error('Failed to get user');
+    }
+
+    const listMember: ListMember = {
+      username: username.toLowerCase(),
+      addedToList: 'queued',
+      listId: '',
+      listOwnerId: '',
+      userId: user.id,
+      collections: {
+        [`${collectionKey}`]: {
+          chainId: collection.chainId,
+          address: trimLowerCase(collection.address),
+          addedAt: Date.now()
+        }
+      }
+    };
+
+    await TwitterList.getMemberRef(listMember.userId).set(listMember);
+
+    return listMember;
   }
 
   private getBotAccountWithMinMembers(): BotAccount | undefined {
