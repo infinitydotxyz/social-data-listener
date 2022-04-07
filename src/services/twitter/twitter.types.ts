@@ -59,8 +59,40 @@ export interface UserIdResponseData {
   name: string;
 }
 
-export interface BasicResponse<T> {
+export type UserNotFoundError = {
+  /**
+   * The username that was not found
+   */
+  value: string;
+  /**
+   * Error message
+   */
+  detail: string;
+  /**
+   * Error title
+   */
+  title: 'Not Found Error' | string;
+  /**
+   * Resource type requested
+   */
+  resource_type: string;
+  /**
+   * Query parameter that caused the error
+   */
+  parameter: string;
+  /**
+   * Id the resource that caused the error
+   */
+  resource_id: string;
+  /**
+   * Link to the problem
+   */
+  type: string;
+};
+
+export interface BasicResponse<T, Error = any> {
   data: T;
+  errors?: Error[];
 }
 
 export interface Collection {

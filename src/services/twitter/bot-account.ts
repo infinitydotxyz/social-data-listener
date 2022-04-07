@@ -1,13 +1,15 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { TwitterList } from './twitter-list';
-import { BotAccountConfig, ListConfig } from './twitter.types';
+import { BasicResponse, BotAccountConfig, ListConfig, UserIdResponseData, UserNotFoundError } from './twitter.types';
 import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
 import { TwitterConfig } from './twitter-config';
 import { TwitterClient, TwitterClientEvent } from './client/twitter-client';
 import { v4 } from 'uuid';
+import { Debouncer } from '../../models/debouncer';
 
+type HandlerReturn = ({ output: UserIdResponseData; id: string } | { id: string; error: Error })[];
 export class BotAccount extends ConfigListener<BotAccountConfig> {
   static ref(botAccountUsername: string) {
     const accountRef = firestore
@@ -32,6 +34,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   public isReady: Promise<void>;
 
   private _lists: Map<string, TwitterList> = new Map();
+  private readonly _debouncer: Debouncer<string, UserIdResponseData> = this.getUsersDebouncer();
 
   constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig, debug = false) {
     super(accountConfig, BotAccount.ref(accountConfig.username));
@@ -121,12 +124,10 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     const name = this.getNewListName();
     let listConfig: ListConfig = {} as any;
     await firestore.runTransaction(async (tx) => {
-      const config = (await tx.get(this._docRef)).data() as BotAccountConfig;
-
-      if (config.numLists + 1 > this._twitterConfig.config.maxListsPerAccount) {
+      if (this._lists.size + 1 > this._twitterConfig.config.maxListsPerAccount) {
         throw new Error('This account has reached the max number of lists');
       }
-
+      console.log(`Creating list ${name}`);
       const { id } = await this.client.createTwitterList(name);
 
       const listRef = this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(id);
@@ -164,5 +165,52 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
         console.warn(event, data);
       });
     }
+  }
+
+  public async getUser(username: string) {
+    const formattedUsername = username.toLowerCase();
+
+    const user = await this._debouncer.enqueue(formattedUsername, formattedUsername);
+    console.log(`Found user: ${user.username} ${user.id}`);
+
+    if (!user?.id) {
+      throw new Error(`Could not find user ${username}`);
+    }
+
+    return user;
+  }
+
+  private getUsersDebouncer() {
+    const handler = async (inputs: { value: string; id: string }[]): Promise<HandlerReturn> => {
+      const usernames = inputs.map(({ value }) => value);
+      const response = await this.client.getUsers(usernames);
+      const users = response?.data ?? [];
+      const errors = response?.errors ?? [];
+      const results: HandlerReturn = [];
+      for (const user of users) {
+        results.push({
+          id: user.username.toLowerCase(),
+          output: user
+        });
+      }
+
+      for (const error of errors) {
+        results.push({
+          id: error.value.toLowerCase(),
+          error: new Error(error.detail)
+        });
+      }
+      return results;
+    };
+
+    const debouncer = new Debouncer<string, UserIdResponseData>(
+      {
+        timeout: 15_000,
+        maxBatchSize: 100
+      },
+      handler
+    );
+
+    return debouncer;
   }
 }

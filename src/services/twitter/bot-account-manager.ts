@@ -7,6 +7,7 @@ import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
 import chalk from 'chalk';
 import Emittery from 'emittery';
+import { Twitter } from './twitter';
 
 export class BotAccountManager extends Emittery<{ tweet: any }> {
   private _botAccounts: Map<string, BotAccount> = new Map();
@@ -21,6 +22,9 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
     await this.isReady;
     try {
       const user = await this.getUser(username);
+
+      // const prevSubscriptions = TwitterConfig.ref.collection(socialDataFirestoreConstants.TWITTER_LIST_MEMBERS_COLL).where(`collections.${collection.chainId}:${collection.address.toLowerCase()}.addedAt`, '>=', 0);
+      // const prevSubscriptionsSnap = await prevSubscriptions.get(); // TODO remove prev subscriptions
 
       let list: TwitterList | undefined;
       let botAccount: BotAccount | undefined;
@@ -38,9 +42,12 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
 
       if (!botAccount) {
         throw new Error('No bot account found');
-      } else if (!list || list.size > this.twitterConfig.config.maxMembersPerList) {
-        list = await botAccount.createList();
+      } else if (!list) {
+        throw new Error('No list found');
       }
+      // else if (!list || list.size > this.twitterConfig.config.maxMembersPerList) {
+      //   list = await botAccount.createList();
+      // }
 
       await list.onCollectionAddUsername(username, collection);
       console.log('Subscribed collection to user', username);

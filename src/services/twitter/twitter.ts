@@ -69,7 +69,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
         }
 
         // Skip invalid handles
-        const handle = Twitter.extractHandle(url).trim();
+        const handle = Twitter.extractHandle(url).trim().toLowerCase();
         if (!handle) {
           continue;
         }

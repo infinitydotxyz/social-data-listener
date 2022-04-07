@@ -4,7 +4,7 @@ import PQueue from 'p-queue';
 import phin from 'phin';
 import { TwitterApi } from 'twitter-api-v2';
 import { OAuth1RequestOptions } from 'twitter-api-v2/dist/client-mixins/oauth1.helper';
-import { BasicResponse, BotAccountConfig, CreateListResponseData, UserIdResponseData } from '../twitter.types';
+import { BasicResponse, BotAccountConfig, CreateListResponseData, UserIdResponseData, UserNotFoundError } from '../twitter.types';
 import { V1AuthHelper } from './v1-auth-helper';
 
 const FIVE_MIN = 5 * 60 * 1000;
@@ -14,6 +14,7 @@ const MAX_REQUEST_ATTEMPTS = 3;
 
 enum TwitterEndpoint {
   GetUser = 'get-user',
+  BatchedGetUser = 'batched-get-user',
   CreateList = 'create-list',
   RemoveMemberFromList = 'remove-member-from-list',
   AddMemberToList = 'add-member-to-list',
@@ -83,6 +84,19 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     }, TwitterEndpoint.GetUser);
 
     return response.data;
+  }
+
+  public async getUsers(usernames: string[]): Promise<BasicResponse<UserIdResponseData[], UserNotFoundError | any>> {
+    const response = await this.requestHandler<BasicResponse<UserIdResponseData[]>>(() => {
+      return phin({
+        method: 'GET',
+        url: `https://api.twitter.com/2/users/by?usernames=${usernames.join(',')}`,
+        headers: {
+          ...this.authHeaders
+        }
+      });
+    }, TwitterEndpoint.BatchedGetUser);
+    return response;
   }
 
   /**

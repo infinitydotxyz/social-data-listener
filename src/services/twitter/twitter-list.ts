@@ -213,7 +213,8 @@ export class TwitterList extends ConfigListener<ListConfig> {
       return existingUser;
     }
 
-    const response = await this._botAccount.client.getUser(username);
+    // const response = await this._botAccount.client.getUser(username);
+    const response = await this._botAccount.getUser(username);
 
     if (!response?.id) {
       throw new Error('Failed to get user id');
