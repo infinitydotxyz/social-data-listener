@@ -107,6 +107,7 @@ export interface ListMemberCollection extends Collection {
 export interface ListMember {
   userId: string;
   username: string;
+  addedToList: boolean;
   listId: string;
   listOwnerId: string;
   collections: Record<string, ListMemberCollection>;

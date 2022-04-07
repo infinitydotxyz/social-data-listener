@@ -6,6 +6,7 @@ import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
 import { TwitterConfig } from './twitter-config';
+import { BatchDebouncer } from '../../models/batch-debouncer';
 
 export type Tweet = any;
 export class TwitterList extends ConfigListener<ListConfig> {
@@ -25,6 +26,8 @@ export class TwitterList extends ConfigListener<ListConfig> {
   static getMemberRef(userId: string): FirebaseFirestore.DocumentReference<ListMember> {
     return this.allMembersRef.doc(userId) as FirebaseFirestore.DocumentReference<ListMember>;
   }
+
+  private _addMemberDebouncer = this.getAddMemberDebouncer();
 
   constructor(
     config: ListConfig,
@@ -73,7 +76,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
    * Returns the number of members in the list
    */
   public get size() {
-    return this.config.numMembers + this.pendingMembers.length;
+    return this.config.numMembers + this._addMemberDebouncer.size;
   }
 
   public getCollectionKey(collection: Collection) {
@@ -145,11 +148,7 @@ export class TwitterList extends ConfigListener<ListConfig> {
   /**
    * Add member to the twitter list
    */
-  private pendingMembers: ListMember[] = [];
-  private debouncedTimeout?: NodeJS.Timeout;
-  private debouncedPromise?: Promise<void>;
   private async addMember(username: string): Promise<ListMember> {
-    const listId = this.config.id;
     const member = await this.getListMember(username);
 
     if (member.listId === this.config.id && member.listOwnerId === this._botAccount.config.username) {
@@ -159,46 +158,79 @@ export class TwitterList extends ConfigListener<ListConfig> {
       throw new Error('Attempted to add user to list that is already part of another list');
     }
 
-    if (this.config.numMembers + 1 > this._twitterConfig.config.maxMembersPerList) {
-      throw new Error('List is full');
-    }
+    const updatedMember = await this._addMemberDebouncer.enqueue(member.userId, member);
 
-    if (!this.debouncedTimeout) {
-      this.debouncedPromise = new Promise((resolve, reject) => {
-        this.debouncedTimeout = setTimeout(async () => {
-          this.debouncedTimeout = undefined;
-          const firstOneHundred = this.pendingMembers.splice(0, 100); // Remove the first 100 members from the pending list
-          const pendingMembersCopy = firstOneHundred;
-          try {
-            const userIds = pendingMembersCopy.map((item) => item.userId);
-            await this._botAccount.client.addListMembers(this.config.id, userIds);
-            console.log(`Added: ${pendingMembersCopy.length} members to list: ${this.config.id}`);
+    return updatedMember;
+  }
 
-            // Add user to listMembers collection
-            const batch = firestore.batch();
-            for (const member of pendingMembersCopy) {
-              member.listId = listId;
-              member.listOwnerId = this._botAccount.config.username;
-              batch.set(TwitterList.getMemberRef(member.userId), member);
-            }
+  //   if (this.config.numMembers + 1 > this._twitterConfig.config.maxMembersPerList) {
+  //     throw new Error('List is full');
+  //   }
 
-            batch.update(this._docRef, {
-              numMembers: firebaseAdmin.firestore.FieldValue.increment(pendingMembersCopy.length)
-            });
+  //   if (!this.debouncedTimeout) {
+  //     this.debouncedPromise = new Promise((resolve, reject) => {
+  //       this.debouncedTimeout = setTimeout(async () => {
+  //         this.debouncedTimeout = undefined;
+  //         const firstOneHundred = this.pendingMembers.splice(0, 100); // Remove the first 100 members from the pending list
+  //         const pendingMembersCopy = firstOneHundred;
+  //         try {
+  //           const userIds = pendingMembersCopy.map((item) => item.userId);
+  //           await this._botAccount.client.addListMembers(this.config.id, userIds);
+  //           console.log(`Added: ${pendingMembersCopy.length} members to list: ${this.config.id}`);
 
-            await batch.commit();
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        }, 60_000);
+  //           // Add user to listMembers collection
+  //           const batch = firestore.batch();
+  //           for (const member of pendingMembersCopy) {
+  //             member.listId = listId;
+  //             member.listOwnerId = this._botAccount.config.username;
+  //             batch.set(TwitterList.getMemberRef(member.userId), member);
+  //           }
+
+  //           batch.update(this._docRef, {
+  //             numMembers: firebaseAdmin.firestore.FieldValue.increment(pendingMembersCopy.length)
+  //           });
+
+  //           await batch.commit();
+  //           resolve();
+  //         } catch (err) {
+  //           reject(err);
+  //         }
+  //       }, 60_000);
+  //     });
+  //   }
+
+  //   this.pendingMembers.push(member);
+  //   await this.debouncedPromise;
+
+  //   return member;
+  // }
+
+  private getAddMemberDebouncer() {
+    type HandlerReturn = Array<{ id: string; output: ListMember } | { id: string; error: Error }>;
+    const handler = async (inputs: { id: string; value: ListMember }[]): Promise<HandlerReturn> => {
+      const screenNames = inputs.map((item) => item.value.username);
+      await this._botAccount.client.addListMembers(this.config.id, screenNames);
+      console.log(`Added: ${screenNames.length} members to list: ${this.config.id}`);
+
+      // Add user to listMembers collection
+      const batch = firestore.batch();
+      for (const input of inputs) {
+        input.value.listId = this.config.id;
+        input.value.listOwnerId = this._botAccount.config.username;
+        batch.set(TwitterList.getMemberRef(input.value.userId), input.value, { merge: true });
+      }
+
+      batch.update(this._docRef, {
+        numMembers: firebaseAdmin.firestore.FieldValue.increment(inputs.length)
       });
-    }
 
-    this.pendingMembers.push(member);
-    await this.debouncedPromise;
+      await batch.commit();
 
-    return member;
+      return inputs.map((item) => ({ id: item.id, output: item.value }));
+    };
+
+    const debouncer = new BatchDebouncer({ timeout: 60_000, maxBatchSize: 100 }, handler);
+    return debouncer;
   }
 
   /**
@@ -213,7 +245,6 @@ export class TwitterList extends ConfigListener<ListConfig> {
       return existingUser;
     }
 
-    // const response = await this._botAccount.client.getUser(username);
     const response = await this._botAccount.getUser(username);
 
     if (!response?.id) {

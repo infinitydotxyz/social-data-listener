@@ -7,7 +7,7 @@ import { firestore } from '../../container';
 import { TwitterConfig } from './twitter-config';
 import { TwitterClient, TwitterClientEvent } from './client/twitter-client';
 import { v4 } from 'uuid';
-import { Debouncer } from '../../models/debouncer';
+import { BatchDebouncer } from '../../models/batch-debouncer';
 
 type HandlerReturn = ({ output: UserIdResponseData; id: string } | { id: string; error: Error })[];
 export class BotAccount extends ConfigListener<BotAccountConfig> {
@@ -34,7 +34,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   public isReady: Promise<void>;
 
   private _lists: Map<string, TwitterList> = new Map();
-  private readonly _debouncer: Debouncer<string, UserIdResponseData> = this.getUsersDebouncer();
+  private readonly _debouncer: BatchDebouncer<string, UserIdResponseData> = this.getUsersDebouncer();
 
   constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig, debug = false) {
     super(accountConfig, BotAccount.ref(accountConfig.username));
@@ -203,7 +203,7 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
       return results;
     };
 
-    const debouncer = new Debouncer<string, UserIdResponseData>(
+    const debouncer = new BatchDebouncer<string, UserIdResponseData>(
       {
         timeout: 15_000,
         maxBatchSize: 100

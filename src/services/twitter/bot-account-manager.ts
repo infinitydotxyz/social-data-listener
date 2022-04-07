@@ -104,7 +104,7 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
   }
 
   private async getUser(username: string): Promise<Partial<ListMember>> {
-    const userSnap = await TwitterList.allMembersRef.where('username', '==', username).get();
+    const userSnap = await TwitterList.allMembersRef.where('username', '==', username.toLowerCase()).get();
     const existingUser = userSnap?.docs?.[0]?.data();
 
     if (!existingUser) {

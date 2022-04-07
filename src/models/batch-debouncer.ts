@@ -1,14 +1,18 @@
 import { sleep } from '@infinityxyz/lib/utils';
-import { VoiceBasedChannel } from 'discord.js';
 
-export class Debouncer<Input, Output> {
+export class BatchDebouncer<Input, Output> {
   private isRunning = false;
   private queue: { value: Input; id: string }[] = [];
+  private pending: { value: Input; id: string }[] = [];
 
   private outputPromises: Map<
     string,
     { resolve: (value: Output | PromiseLike<Output>) => void; reject: (reason?: any) => void }
   > = new Map();
+
+  public get size() {
+    return this.queue.length + this.pending.length;
+  }
 
   constructor(
     private readonly options: { timeout: number; maxBatchSize: number },
@@ -48,9 +52,9 @@ export class Debouncer<Input, Output> {
   private async process() {
     while (this.queue.length > 0) {
       await sleep(this.options.timeout);
-      const batch = this.queue.splice(0, this.options.maxBatchSize);
+      this.pending = this.queue.splice(0, this.options.maxBatchSize);
       try {
-        const results = await this.fn(batch);
+        const results = await this.fn(this.pending);
         for (const output of results) {
           const promise = this.outputPromises.get(output.id);
           if (promise) {
@@ -63,11 +67,12 @@ export class Debouncer<Input, Output> {
           }
         }
       } catch (err) {
-        for (const item of batch) {
+        for (const item of this.pending) {
           this.outputPromises.get(item.id)?.reject(err);
           this.outputPromises.delete(item.id);
         }
       }
+      this.pending = [];
     }
   }
 }

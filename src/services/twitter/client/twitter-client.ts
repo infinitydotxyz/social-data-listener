@@ -125,10 +125,12 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     };
   }
 
-  async addListMembers(listId: string, userIds: string[]): Promise<any> {
+  async addListMembers(listId: string, screenNames: string[]): Promise<any> {
     const url = new URL('https://api.twitter.com/1.1/lists/members/create_all.json');
     url.searchParams.set('list_id', listId);
-    url.searchParams.set('user_id', userIds.join(','));
+    url.searchParams.set('screen_name', screenNames.join(','));
+
+    console.log(url.toString());
 
     const response = await this.requestHandler<any>(async () => {
       const request: OAuth1RequestOptions = {
@@ -146,6 +148,8 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       });
       return response;
     }, TwitterEndpoint.BatchedAddMembersToList);
+
+    console.log(response);
 
     return response;
   }

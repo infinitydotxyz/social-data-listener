@@ -54,7 +54,10 @@ export class Twitter extends Listener<TwitterTweetEvent> {
       chainId: '1'
     };
 
-    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+    const query = this.db
+      .collection(firestoreConstants.COLLECTIONS_COLL)
+      .where('state.create.step', '==', 'complete')
+      .offset(600);
 
     query.onSnapshot((snapshot) => {
       const changes = snapshot.docChanges().slice(0, 250);
