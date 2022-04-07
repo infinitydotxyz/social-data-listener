@@ -1,6 +1,6 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { TwitterList } from './twitter-list';
-import { BasicResponse, BotAccountConfig, ListConfig, UserIdResponseData, UserNotFoundError } from './twitter.types';
+import { BotAccountConfig, ListConfig, UserIdResponseData } from './twitter.types';
 import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
@@ -8,6 +8,8 @@ import { TwitterConfig } from './twitter-config';
 import { TwitterClient, TwitterClientEvent } from './client/twitter-client';
 import { v4 } from 'uuid';
 import { BatchDebouncer } from '../../models/batch-debouncer';
+import ListAccountQueue from './list-account-queue';
+import { sleep } from '@infinityxyz/lib/utils';
 
 type HandlerReturn = ({ output: UserIdResponseData; id: string } | { id: string; error: Error })[];
 export class BotAccount extends ConfigListener<BotAccountConfig> {
@@ -30,13 +32,18 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
   }
 
   public client: TwitterClient;
-
   public isReady: Promise<void>;
 
+  private listsInitialized = false;
   private _lists: Map<string, TwitterList> = new Map();
-  private readonly _debouncer: BatchDebouncer<string, UserIdResponseData> = this.getUsersDebouncer();
+  private readonly _batchedGetUser: BatchDebouncer<string, UserIdResponseData> = this.getUsersDebouncer();
 
-  constructor(accountConfig: BotAccountConfig, private _twitterConfig: TwitterConfig, debug = false) {
+  constructor(
+    accountConfig: BotAccountConfig,
+    private _twitterConfig: TwitterConfig,
+    private _listAccountQueue: ListAccountQueue,
+    debug = false
+  ) {
     super(accountConfig, BotAccount.ref(accountConfig.username));
     this.isReady = this.initLists();
 
@@ -48,6 +55,24 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     if (debug) {
       this.enableDebugging();
     }
+
+    /**
+     * Start getting users from the queue and adding them to lists
+     */
+    void this.addUsersToLists();
+  }
+
+  public async getUser(username: string) {
+    const formattedUsername = username.toLowerCase();
+
+    const user = await this._batchedGetUser.enqueue(formattedUsername, formattedUsername);
+    console.log(`Found user: ${user.username} ${user.id}`);
+
+    if (!user?.id) {
+      throw new Error(`Could not find user ${username}`);
+    }
+
+    return user;
   }
 
   public getNumListsMembers() {
@@ -81,7 +106,35 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
     return this._lists.get(id);
   }
 
-  private listsInitialized = false;
+  private async addUsersToLists() {
+    await this.isReady;
+    for (;;) {
+      try {
+        const account = await this._listAccountQueue.getAccount();
+
+        if (!account) {
+          await sleep(60_000); // Wait a min
+          continue;
+        }
+
+        try {
+          const list = await this.getListWithMinMembers();
+          if (!list) {
+            throw new Error('No list found');
+          }
+          await list?.addMemberToList(account);
+        } catch (err) {
+          /**
+           * Re-enqueue user if we fail to add them to a list
+           */
+          await TwitterList.getMemberRef(account.userId).update({ addedToList: 'queued' });
+        }
+      } catch (err) {
+        console.error('Failed to get account', err);
+      }
+    }
+  }
+
   private async initLists(): Promise<void> {
     if (this.listsInitialized) {
       return;
@@ -95,7 +148,6 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
           if (change.type === 'added') {
             console.log('List loaded', change.doc.id);
             const listConfig = change.doc.data() as ListConfig;
-
             const list = new TwitterList(listConfig, this, this._twitterConfig, this.onTweet.bind(this));
             this._lists.set(listConfig.id, list);
           } else if (change.type === 'removed') {
@@ -165,19 +217,6 @@ export class BotAccount extends ConfigListener<BotAccountConfig> {
         console.warn(event, data);
       });
     }
-  }
-
-  public async getUser(username: string) {
-    const formattedUsername = username.toLowerCase();
-
-    const user = await this._debouncer.enqueue(formattedUsername, formattedUsername);
-    console.log(`Found user: ${user.username} ${user.id}`);
-
-    if (!user?.id) {
-      throw new Error(`Could not find user ${username}`);
-    }
-
-    return user;
   }
 
   private getUsersDebouncer() {

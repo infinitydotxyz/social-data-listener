@@ -113,7 +113,7 @@ export interface ListMember {
    * pending is used when the member is being added to a list
    */
   addedToList: 'added' | 'pending' | 'queued';
-  pendingSize?: number;
+  pendingSince?: number;
   listId: string;
   listOwnerId: string;
   collections: Record<string, ListMemberCollection>;

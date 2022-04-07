@@ -7,6 +7,7 @@ import { firestore } from '../../container';
 import chalk from 'chalk';
 import Emittery from 'emittery';
 import { trimLowerCase } from '@infinityxyz/lib/utils';
+import ListAccountQueue from './list-account-queue';
 
 export class BotAccountManager extends Emittery<{ tweet: any }> {
   static getCollectionKey(collection: Collection) {
@@ -16,7 +17,7 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
   private _botAccounts: Map<string, BotAccount> = new Map();
 
   private isReady: Promise<void>;
-  constructor(private twitterConfig: TwitterConfig, debug = false) {
+  constructor(private twitterConfig: TwitterConfig, private _listAccountQueue: ListAccountQueue, debug = false) {
     super();
     this.isReady = this.initBotAccounts(debug);
   }
@@ -36,32 +37,32 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
     }
   }
 
-  /**
-   * TODO is this needed?
-   */
-  public async unsubscribeCollectionFromUser(username: string, collection: Collection) {
-    await this.isReady;
-    try {
-      const user = await this.getUser(username);
-      let list: TwitterList | undefined;
+  // /**
+  //  * TODO is this needed?
+  //  */
+  // public async unsubscribeCollectionFromUser(username: string, collection: Collection) {
+  //   await this.isReady;
+  //   try {
+  //     const user = await this.getUser(username);
+  //     let list: TwitterList | undefined;
 
-      if (!user.listId || !user.listOwnerId) {
-        const ref = TwitterList.getMemberRef(username);
-        await ref.delete();
-      } else {
-        const res = this.getListByIds(user.listOwnerId, user.listId);
-        list = res.list;
+  //     if (!user.listId || !user.listOwnerId) {
+  //       const ref = TwitterList.getMemberRef(username);
+  //       await ref.delete();
+  //     } else {
+  //       const res = this.getListByIds(user.listOwnerId, user.listId);
+  //       list = res.list;
 
-        if (!list) {
-          throw new Error('List not found');
-        }
+  //       if (!list) {
+  //         throw new Error('List not found');
+  //       }
 
-        await list.onCollectionRemoveUsername(username, collection);
-      }
-    } catch (err) {
-      console.error('Failed to remove user from list', err);
-    }
-  }
+  //       await list.onCollectionRemoveUsername(username, collection);
+  //     }
+  //   } catch (err) {
+  //     console.error('Failed to remove user from list', err);
+  //   }
+  // }
 
   private async subscribeCollectionToExistingUser(user: ListMember, collection: Collection) {
     const collectionKey = BotAccountManager.getCollectionKey(collection);
@@ -167,7 +168,7 @@ export class BotAccountManager extends Emittery<{ tweet: any }> {
             const isValidConfig = BotAccount.validateConfig(accountConfig);
             if (isValidConfig) {
               console.log('Bot account added', accountConfig.username);
-              const botAccount = new BotAccount(accountConfig, this.twitterConfig, debug);
+              const botAccount = new BotAccount(accountConfig, this.twitterConfig, this._listAccountQueue, debug);
               this._botAccounts.set(accountConfig.username, botAccount);
             }
           };

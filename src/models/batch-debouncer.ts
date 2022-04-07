@@ -1,7 +1,7 @@
 import { sleep } from '@infinityxyz/lib/utils';
 
 export class BatchDebouncer<Input, Output> {
-  private isRunning = false;
+  private mutex = false;
   private queue: { value: Input; id: string }[] = [];
   private pending: { value: Input; id: string }[] = [];
 
@@ -22,8 +22,6 @@ export class BatchDebouncer<Input, Output> {
   ) {}
 
   public async enqueue(id: string, value: Input): Promise<Output> {
-    console.log(`Enqueuing ${id} ${value}`);
-
     const promise = new Promise<Output>((res, rej) => {
       this.outputPromises.set(id, {
         resolve: res,
@@ -38,14 +36,14 @@ export class BatchDebouncer<Input, Output> {
   }
 
   private async mutexProcess() {
-    if (!this.isRunning) {
-      this.isRunning = true;
+    if (!this.mutex) {
+      this.mutex = true;
       try {
         await this.process();
       } catch (err) {
         console.error('Failed to process batches', err);
       }
-      this.isRunning = false;
+      this.mutex = false;
     }
   }
 

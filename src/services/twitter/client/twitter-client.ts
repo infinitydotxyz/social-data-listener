@@ -130,8 +130,6 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     url.searchParams.set('list_id', listId);
     url.searchParams.set('screen_name', screenNames.join(','));
 
-    console.log(url.toString());
-
     const response = await this.requestHandler<any>(async () => {
       const request: OAuth1RequestOptions = {
         method: 'POST',
@@ -148,8 +146,6 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       });
       return response;
     }, TwitterEndpoint.BatchedAddMembersToList);
-
-    console.log(response);
 
     return response;
   }
@@ -289,7 +285,9 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
         case 429:
           retry = true;
-          await sleep(ep?.expBackOff ?? 10_000);
+          const sleepFor = ep?.expBackOff ?? 10_000;
+          console.log(`Rate limited, sleeping for: ${sleepFor}`);
+          await sleep(sleepFor);
           break;
 
         default:

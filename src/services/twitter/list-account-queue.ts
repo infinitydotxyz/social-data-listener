@@ -27,12 +27,10 @@ export default class ListAccountQueue {
     const accountsRef = firestore
       .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
       .doc(socialDataFirestoreConstants.TWITTER_DOC)
-      .collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL);
+      .collection(socialDataFirestoreConstants.TWITTER_LIST_MEMBERS_COLL);
     const accountsWaitingToBeAddedToList = accountsRef.where('addedToList', '==', 'queued');
     accountsWaitingToBeAddedToList.onSnapshot((snapshot) => {
       const changes = snapshot.docChanges();
-      changes.map((change) => change.doc.data());
-
       for (const change of changes) {
         switch (change.type) {
           case 'added':

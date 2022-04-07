@@ -2,17 +2,12 @@
 import { Collection } from '@infinityxyz/lib/types/core/Collection';
 import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
-import { resolveConfigFile } from 'prettier';
 import { ApiResponseError, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
-import { socialDataFirestoreConstants } from '../../constants';
-import { firestore } from '../../container';
 import Listener, { OnEvent } from '../listener';
-import { BotAccount } from './bot-account';
 import { BotAccountManager } from './bot-account-manager';
-import { TwitterClient } from './client/twitter-client';
+import ListAccountQueue from './list-account-queue';
 import { defaultTwitterConfig, TwitterConfig } from './twitter-config';
-import { TwitterList } from './twitter-list';
-import { BotAccountConfig, TwitterConfig as ITwitterConfig } from './twitter.types';
+import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -38,14 +33,14 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
   async setup(): Promise<void> {
     const twitterConfig = await this.getTwitterConfig();
+    const listAccountQueue = new ListAccountQueue();
     const debug = true;
-    const botAccountManager = new BotAccountManager(twitterConfig, debug);
+    const botAccountManager = new BotAccountManager(twitterConfig, listAccountQueue, debug);
 
     const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
 
     query.onSnapshot((snapshot) => {
       const changes = snapshot.docChanges();
-      console.log(`Received: ${changes.length} collections`);
 
       for (const change of changes) {
         // Skip collections w/o twitter url
@@ -71,10 +66,10 @@ export class Twitter extends Listener<TwitterTweetEvent> {
             });
             break;
           case 'removed':
-            void botAccountManager.unsubscribeCollectionFromUser(handle, {
-              chainId: collectionData.chainId,
-              address: collectionData.address
-            });
+            // void botAccountManager.unsubscribeCollectionFromUser(handle, {
+            //   chainId: collectionData.chainId,
+            //   address: collectionData.address
+            // });
             break;
         }
       }
