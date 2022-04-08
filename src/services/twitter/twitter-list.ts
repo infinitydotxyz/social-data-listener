@@ -78,6 +78,24 @@ export class TwitterList extends ConfigListener<
     await batch.commit();
   }
 
+  public async removeMemberFromList(account: ListMember) {
+    if (account.listId !== this.config.id) {
+      throw new Error(`Attempted to remove user from list which user is not a member of`);
+    }
+
+    const { isUserMember } = await this._botAccount.client.removeListMember(this.config.id, account.userId);
+    if (isUserMember) {
+      throw new Error(`Failed to remove user from list`);
+    }
+
+    const batch = firestore.batch();
+    batch.delete(TwitterList.getMemberRef(account.userId));
+    batch.update(this._docRef, {
+      numMembers: firebaseAdmin.firestore.FieldValue.increment(-1)
+    });
+    await batch.commit();
+  }
+
   private async processTweets() {
     for (;;) {
       try {

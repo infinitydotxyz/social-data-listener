@@ -222,9 +222,11 @@ export class BotAccountManager extends Emittery<{
 
     if (collections.length === 0) {
       try {
-        const list = this.getListByIds(listMember.listOwnerId, listMember.listId);
-        // TODO unsubscribe from list
-        await listMemberRef.delete();
+        const { list } = this.getListByIds(listMember.listOwnerId, listMember.listId);
+        if (!list) {
+          throw new Error('Failed to find list to remove user from');
+        }
+        await list.removeMemberFromList(listMember);
       } catch (err) {
         console.error('Failed to delete list member', err);
       }
