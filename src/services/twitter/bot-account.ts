@@ -1,6 +1,6 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { TwitterList } from './twitter-list';
-import { BotAccountConfig, ListConfig, UserIdResponseData } from './twitter.types';
+import { BotAccountConfig, ListConfig, TwitterTweetEventPreCollectionData, UserIdResponseData } from './twitter.types';
 import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
@@ -10,12 +10,14 @@ import { v4 } from 'uuid';
 import { BatchDebouncer } from '../../models/batch-debouncer';
 import ListAccountQueue from './list-account-queue';
 import { sleep } from '@infinityxyz/lib/utils';
-import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed/TwitterEvent';
 
 type HandlerReturn = ({ output: UserIdResponseData; id: string } | { id: string; error: Error })[];
 export class BotAccount extends ConfigListener<
   BotAccountConfig,
-  { docSnapshot: BotAccountConfig; tweetEvent: { tweet: TwitterTweetEvent; botAccountId: string; listId: string } }
+  {
+    docSnapshot: BotAccountConfig;
+    tweetEvent: { tweet: TwitterTweetEventPreCollectionData; botAccountId: string; listId: string };
+  }
 > {
   static ref(botAccountUsername: string) {
     const accountRef = firestore
@@ -70,8 +72,6 @@ export class BotAccount extends ConfigListener<
     const formattedUsername = username.toLowerCase();
 
     const user = await this._batchedGetUser.enqueue(formattedUsername, formattedUsername);
-    console.log(`Found user: ${user.username} ${user.id}`);
-
     if (!user?.id) {
       throw new Error(`Could not find user ${username}`);
     }

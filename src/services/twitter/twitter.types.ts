@@ -1,3 +1,5 @@
+import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+
 export interface TwitterConfig {
   /**
    * The number of lists that each bot account can have
@@ -145,7 +147,7 @@ export interface Tweet {
   /**
    * "2022-03-27T20:19:03.000Z"
    */
-  createdAt: string;
+  created_at: string;
 }
 
 export interface TweetAttachments {
@@ -174,3 +176,14 @@ export interface ListTweetsResponse {
     next_token?: string;
   };
 }
+
+export type TwitterTweetEventPreCollectionData = Omit<
+  TwitterTweetEvent,
+  | 'chainId'
+  | 'collectionAddress'
+  | 'collectionName'
+  | 'collectionSlug'
+  | 'collectionProfileImage'
+  | 'internalUrl'
+  | 'hasBlueCheck'
+>;

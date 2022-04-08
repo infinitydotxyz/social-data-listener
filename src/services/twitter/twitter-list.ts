@@ -1,15 +1,24 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { BotAccount } from './bot-account';
-import { ListConfig, Collection, ListMember, TwitterUser, TweetMedia } from './twitter.types';
+import {
+  ListConfig,
+  Collection,
+  ListMember,
+  TwitterUser,
+  TweetMedia,
+  Tweet,
+  TwitterTweetEventPreCollectionData
+} from './twitter.types';
 import { sleep, trimLowerCase } from '@infinityxyz/lib/utils';
 import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../models/config-listener.abstract';
 import { firestore } from '../../container';
-import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { FeedEventType } from '@infinityxyz/lib/types/core/feed';
 
-export type Tweet = any;
-
-export class TwitterList extends ConfigListener<ListConfig, { docSnapshot: ListConfig; tweetEvent: TwitterTweetEvent }> {
+export class TwitterList extends ConfigListener<
+  ListConfig,
+  { docSnapshot: ListConfig; tweetEvent: TwitterTweetEventPreCollectionData }
+> {
   static ref(botAccount: BotAccount, listId: string): FirebaseFirestore.DocumentReference<ListConfig> {
     const botAccountRef = BotAccount.ref(botAccount.config.username);
     const listRef = botAccountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(listId);
@@ -72,6 +81,7 @@ export class TwitterList extends ConfigListener<ListConfig, { docSnapshot: ListC
   private async processTweets() {
     for (;;) {
       try {
+        console.log(`Getting new Tweets: ${this.config.id}`);
         await this.getNewTweets();
       } catch (err) {
         console.error('Failed to get tweets', err);
@@ -87,6 +97,7 @@ export class TwitterList extends ConfigListener<ListConfig, { docSnapshot: ListC
     let page = 0;
     const MAX_PAGES = 8; // Api is limited to 8 pages
     let cursor = '';
+    let tweetsEmitted = 0;
     while (shouldGetNextPage && page < MAX_PAGES) {
       page += 1;
       const response = await this._botAccount.client.getListTweets(this.config.id, cursor);
@@ -124,22 +135,31 @@ export class TwitterList extends ConfigListener<ListConfig, { docSnapshot: ListC
           // Ignore retweets
           continue;
         }
+        const username = usersMap?.[tweet.author_id]?.username ?? '';
+        const tweetMedia = tweet?.attachments?.media_keys.map((key: string) => mediaMap?.[key]) ?? [];
+        const media = tweetMedia.pop();
+        const user = usersMap?.[tweet.author_id];
 
-        const event: TwitterTweetEvent = {
+        const event: TwitterTweetEventPreCollectionData = {
           type: FeedEventType.TwitterTweet,
+          externalLink: this.getTweetLink(username, tweet.id),
           id: tweet.id,
           authorId: tweet.author_id,
+          username: user.username ?? '',
+          authorProfileImage: user.profile_image_url ?? '',
+          authorName: user.name ?? '',
+          authorVerified: user.verified ?? false,
           text: tweet.text,
           source: tweet.source,
-          image: mediaMap?.[tweet.media_key]?.preview_image_url ?? '',
+          image: media?.preview_image_url ?? '',
           language: tweet.lang,
           isSensitive: tweet.possibly_sensitive,
-          username: usersMap?.[tweet.author_id]?.username ?? '',
           likes: 0,
           comments: 0,
           timestamp: new Date(tweet.created_at).getTime()
         };
         void this.emit('tweetEvent', event);
+        tweetsEmitted += 1;
       }
 
       cursor = meta?.next_token ?? '';
@@ -148,6 +168,14 @@ export class TwitterList extends ConfigListener<ListConfig, { docSnapshot: ListC
         shouldGetNextPage = false;
       }
     }
-    await this._docRef.update({ mostRecentTweetId: newMostRecentTweetId });
+
+    await this._docRef.update({
+      mostRecentTweetId: newMostRecentTweetId,
+      totalTweets: firebaseAdmin.firestore.FieldValue.increment(tweetsEmitted)
+    });
+  }
+
+  private getTweetLink(username: string, tweetId: string) {
+    return `https://twitter.com/${username}/status/${tweetId}`;
   }
 }

@@ -1,17 +1,18 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { BotAccount } from './bot-account';
-import { BotAccountConfig, Collection, ListMember } from './twitter.types';
+import { BotAccountConfig, Collection, ListMember, TwitterTweetEventPreCollectionData } from './twitter.types';
 import { TwitterList } from './twitter-list';
 import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
 import chalk from 'chalk';
 import Emittery from 'emittery';
-import { trimLowerCase } from '@infinityxyz/lib/utils';
+import { firestoreConstants, getCollectionDocId, getInfinityLink, trimLowerCase } from '@infinityxyz/lib/utils';
 import ListAccountQueue from './list-account-queue';
-import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed/TwitterEvent';
+import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { Collection as CollectionDoc, InfinityLinkType } from '@infinityxyz/lib/types/core';
 
 export class BotAccountManager extends Emittery<{
-  tweetEvent: { tweet: TwitterTweetEvent; botAccountId: string; listId: string };
+  tweetEvent: TwitterTweetEvent;
 }> {
   static getCollectionKey(collection: Collection) {
     return `${collection.chainId}:${trimLowerCase(collection.address)}`;
@@ -44,7 +45,8 @@ export class BotAccountManager extends Emittery<{
   private async subscribeCollectionToExistingUser(user: ListMember, collection: Collection) {
     const collectionKey = BotAccountManager.getCollectionKey(collection);
 
-    if (user.collections[collectionKey].addedAt > 0) {
+    const addedAt = user?.collections?.[collectionKey]?.addedAt ?? 0;
+    if (addedAt > 0) {
       return; // Collection is already subscribed
     }
 
@@ -147,6 +149,13 @@ export class BotAccountManager extends Emittery<{
               console.log('Bot account added', accountConfig.username);
               const botAccount = new BotAccount(accountConfig, this.twitterConfig, this._listAccountQueue, debug);
               this._botAccounts.set(accountConfig.username, botAccount);
+              botAccount.on('tweetEvent', async (event) => {
+                try {
+                  await this.handleTweetEvent(event.tweet);
+                } catch (err) {
+                  console.error(err);
+                }
+              });
             }
           };
 
@@ -177,5 +186,50 @@ export class BotAccountManager extends Emittery<{
           }
         });
     });
+  }
+
+  private async handleTweetEvent(tweetEvent: TwitterTweetEventPreCollectionData) {
+    const listMemberId = tweetEvent.authorId;
+    const listMemberRef = TwitterList.getMemberRef(listMemberId);
+
+    const listMemberSnap = await listMemberRef.get();
+    const listMember = listMemberSnap.data() as ListMember;
+
+    const collections = Object.values(listMember?.collections ?? {});
+
+    if (collections.length === 0) {
+      try {
+        const list = this.getListByIds(listMember.listOwnerId, listMember.listId);
+        // TODO unsubscribe from list
+        await listMemberRef.delete();
+      } catch (err) {
+        console.error('Failed to delete list member', err);
+      }
+      return;
+    }
+
+    const getCollectionRef = (collection: Collection) => {
+      const id = getCollectionDocId({ collectionAddress: collection.address, chainId: collection.chainId });
+      return firestore.collection(firestoreConstants.COLLECTIONS_COLL).doc(id);
+    };
+    const collectionRefs = collections.map((item) => getCollectionRef(item));
+    const collectionsSnapshot = await firestore.getAll(...collectionRefs);
+    for (const snap of collectionsSnapshot) {
+      const collection: CollectionDoc | undefined = snap.data() as CollectionDoc | undefined;
+
+      if (collection) {
+        const event: TwitterTweetEvent = {
+          ...tweetEvent,
+          chainId: collection.chainId,
+          collectionAddress: collection.address,
+          collectionName: collection.metadata.name,
+          collectionSlug: collection.slug,
+          collectionProfileImage: collection.metadata.profileImage,
+          hasBlueCheck: collection.hasBlueCheck,
+          internalUrl: getInfinityLink({ type: InfinityLinkType.Collection, addressOrSlug: collection.slug })
+        };
+        void this.emit('tweetEvent', event);
+      }
+    }
   }
 }

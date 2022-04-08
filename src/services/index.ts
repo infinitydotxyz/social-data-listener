@@ -18,16 +18,7 @@ export const DEFAULT_USER_AGENT =
 export async function startServices(writer: (event: SocialFeedEvent) => Promise<void>) {
   const db = getDb();
 
-  const twitter = new Twitter(
-    {
-      accessToken: process.env.TWITTER_OAUTH_ACCESS_TOKEN!,
-      refreshToken: process.env.TWITTER_OAUTH_REFRESH_TOKEN!,
-      listId: process.env.TWITTER_LIST_ID!,
-      clientId: process.env.TWITTER_CLIENT_ID!,
-      clientSecret: process.env.TWITTER_CLIENT_SECRET!
-    },
-    db
-  );
+  const twitter = new Twitter(db);
 
   const discord = new Discord(
     {

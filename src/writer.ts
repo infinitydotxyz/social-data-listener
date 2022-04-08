@@ -1,25 +1,23 @@
-import { DiscordAnnouncementEvent, FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import { SocialFeedEvent } from './services';
-import { Twitter } from './services/twitter';
 
 /**
  * Writes events to the feed collection in the database.
  * @param event
  */
 export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Firestore) {
-  console.log(event);
-
   switch (event.type) {
     case FeedEventType.TwitterTweet:
+      const feedDoc = db.collection(firestoreConstants.FEED_COLL);
+      const doc = await feedDoc.add(event);
+      console.log(`wrote tweet to feed ${doc.id}`);
+      break;
+
     case FeedEventType.DiscordAnnouncement:
       let query = db.collection(firestoreConstants.COLLECTIONS_COLL).select('address');
 
-      if (event.type === FeedEventType.TwitterTweet) {
-        query = query.where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username));
-      } else {
-        query = query.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
-      }
+      query = query.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
 
       const snapshot = await query.get();
 
