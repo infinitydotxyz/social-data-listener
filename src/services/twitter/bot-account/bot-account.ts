@@ -1,25 +1,22 @@
-import { socialDataFirestoreConstants } from '../../constants';
-import { TwitterList } from './twitter-list/twitter-list';
-import { BotAccountConfig, ListConfig, TwitterTweetEventPreCollectionData, UserIdResponseData } from './twitter.types';
+import { socialDataFirestoreConstants } from '../../../constants';
+import { TwitterList } from '../twitter-list/twitter-list';
+import { BotAccountConfig, ListConfig, UserIdResponseData } from '../twitter.types';
 import firebaseAdmin from 'firebase-admin';
-import { ConfigListener } from '../../models/config-listener.abstract';
-import { firestore } from '../../container';
-import { TwitterConfig } from './twitter-config';
-import { TwitterClient, TwitterClientEvent } from './client/twitter-client';
+import { ConfigListener } from '../../../models/config-listener.abstract';
+import { firestore } from '../../../container';
+import { TwitterConfig } from '../twitter-config';
+import { TwitterClient } from '../client/twitter-client';
 import { v4 } from 'uuid';
-import { BatchDebouncer } from '../../models/batch-debouncer';
-import ListAccountQueue from './list-account-queue';
+import { BatchDebouncer } from '../../../models/batch-debouncer';
+import ListAccountQueue from '../list-account-queue';
 import { sleep } from '@infinityxyz/lib/utils';
-import { ListEvent, TwitterListEvent } from './twitter-list/twitter-list.events';
+import { TwitterListEvents, TwitterListEvent, TwitterListsEventsType } from '../twitter-list/twitter-list.events';
+import { BotAccountEvent, BotAccountEventsType } from './bot-account.events';
 
 type HandlerReturn = ({ output: UserIdResponseData; id: string } | { id: string; error: Error })[];
 export class BotAccount extends ConfigListener<
   BotAccountConfig,
-  Record<TwitterListEvent, ListEvent> & { docSnapshot: BotAccountConfig }
-  // {
-  //   docSnapshot: BotAccountConfig;
-  //   tweetEvent: { tweet: TwitterTweetEventPreCollectionData; botAccountId: string; listId: string };
-  // }
+  TwitterListsEventsType & { docSnapshot: BotAccountConfig } & BotAccountEventsType
 > {
   public client: TwitterClient;
   public isReady: Promise<void>;
@@ -36,6 +33,11 @@ export class BotAccount extends ConfigListener<
   ) {
     super(accountConfig, BotAccount.ref(accountConfig.username));
     this.isReady = this.initLists();
+    this.isReady
+      .then(() => {
+        void this.emit(BotAccountEvent.Loaded, { type: BotAccountEvent.Loaded, ...this.baseEvent, config: this.config });
+      })
+      .catch(console.error);
 
     this.client = new TwitterClient(accountConfig, this.saveConfig.bind(this));
     this.on('docSnapshot', (config) => {
@@ -112,6 +114,19 @@ export class BotAccount extends ConfigListener<
     return this._lists.get(id);
   }
 
+  private get baseEvent() {
+    let totalTweets = 0;
+    this._lists.forEach((list) => {
+      totalTweets += list.size;
+    });
+
+    return {
+      account: this.config.username,
+      numLists: this._lists.size,
+      totalTweets
+    };
+  }
+
   private async addUsersToLists() {
     await this.isReady;
     for (;;) {
@@ -155,9 +170,11 @@ export class BotAccount extends ConfigListener<
             const listConfig = change.doc.data() as ListConfig;
             this.addList(listConfig);
           } else if (change.type === 'removed') {
-            console.log('List removed', change.doc.id);
+            const list = this._lists.get(change.doc.id);
+            const config = list?.config;
             this._lists.delete(change.doc.id);
             await this._docRef.update({ numLists: firebaseAdmin.firestore.FieldValue.increment(-1) });
+            void this.emit(BotAccountEvent.ListDeleted, { ...this.baseEvent, type: BotAccountEvent.ListDeleted, list: config });
           }
         }
 
@@ -179,7 +196,6 @@ export class BotAccount extends ConfigListener<
       if (this._lists.size + 1 > this._twitterConfig.config.maxListsPerAccount) {
         throw new Error('This account has reached the max number of lists');
       }
-      console.log(`Creating list ${name}`);
       const { id } = await this.client.createTwitterList(name);
 
       const listRef = this._docRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(id);
@@ -208,15 +224,14 @@ export class BotAccount extends ConfigListener<
     if (existingList) {
       return existingList;
     }
-    console.log(`List loaded: ${listConfig.name}`);
     const newList = new TwitterList(listConfig, this);
-    newList.onAny((eventName: TwitterListEvent | 'docSnapshot', event: ListEvent | ListConfig) => {
+    newList.onAny((eventName: TwitterListEvent | 'docSnapshot', event: TwitterListEvents | ListConfig) => {
       if ('type' in event && eventName !== 'docSnapshot') {
         void this.emit(eventName, event);
       }
     });
     this._lists.set(listConfig.id, newList);
-
+    void this.emit(BotAccountEvent.ListLoaded, { ...this.baseEvent, type: BotAccountEvent.ListLoaded, list: listConfig });
     return newList;
   }
 
@@ -229,12 +244,9 @@ export class BotAccount extends ConfigListener<
   }
 
   private enableDebugging() {
-    const events = Object.values(TwitterClientEvent);
-    for (const event of events) {
-      this.client.on(event, (data) => {
-        console.warn(event, data);
-      });
-    }
+    this.client.onAny((event, data) => {
+      console.warn(event, data);
+    });
   }
 
   private getUsersDebouncer() {

@@ -1,5 +1,5 @@
 import { socialDataFirestoreConstants } from '../../../constants';
-import { BotAccount } from '../bot-account';
+import { BotAccount } from '../bot-account/bot-account';
 import {
   ListConfig,
   Collection,
@@ -14,9 +14,9 @@ import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../../models/config-listener.abstract';
 import { firestore } from '../../../container';
 import { FeedEventType } from '@infinityxyz/lib/types/core/feed';
-import { ListEvent, TwitterListEvent } from './twitter-list.events';
+import { TwitterListEvent, TwitterListsEventsType } from './twitter-list.events';
 
-export class TwitterList extends ConfigListener<ListConfig, Record<TwitterListEvent, ListEvent> & { docSnapshot: ListConfig }> {
+export class TwitterList extends ConfigListener<ListConfig, TwitterListsEventsType & { docSnapshot: ListConfig }> {
   static ref(botAccount: BotAccount, listId: string): FirebaseFirestore.DocumentReference<ListConfig> {
     const botAccountRef = BotAccount.ref(botAccount.config.username);
     const listRef = botAccountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(listId);

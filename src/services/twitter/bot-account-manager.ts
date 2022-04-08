@@ -1,5 +1,5 @@
 import { socialDataFirestoreConstants } from '../../constants';
-import { BotAccount } from './bot-account';
+import { BotAccount } from './bot-account/bot-account';
 import { BotAccountConfig, Collection, ListMember, TwitterTweetEventPreCollectionData } from './twitter.types';
 import { TwitterList } from './twitter-list/twitter-list';
 import { TwitterConfig } from './twitter-config';
@@ -10,6 +10,7 @@ import { firestoreConstants, getCollectionDocId, getInfinityLink, trimLowerCase 
 import ListAccountQueue from './list-account-queue';
 import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { Collection as CollectionDoc, InfinityLinkType } from '@infinityxyz/lib/types/core';
+import { BotAccountEvent } from './bot-account/bot-account.events';
 
 export class BotAccountManager extends Emittery<{
   tweetEvent: TwitterTweetEvent;
@@ -178,7 +179,7 @@ export class BotAccountManager extends Emittery<{
               console.log('Bot account added', accountConfig.username);
               const botAccount = new BotAccount(accountConfig, this.twitterConfig, this._listAccountQueue, debug);
               this._botAccounts.set(accountConfig.username, botAccount);
-              botAccount.on('tweetEvent', async (event) => {
+              botAccount.on(BotAccountEvent.Tweet, async (event) => {
                 try {
                   await this.handleTweetEvent(event.tweet);
                 } catch (err) {

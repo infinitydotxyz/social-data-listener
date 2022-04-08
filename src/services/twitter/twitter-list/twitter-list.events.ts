@@ -4,8 +4,7 @@ export enum TwitterListEvent {
   NewTweet = 'new-tweet',
   MemberAdded = 'member-added',
   MemberRemoved = 'member-removed',
-  PolledTweets = 'polled-tweets',
-  ConfigUpdate = 'docSnapshot'
+  PolledTweets = 'polled-tweets'
 }
 
 export interface ListEventType {
@@ -48,4 +47,11 @@ export interface PolledTweetsEvent extends ListEventType {
   pagesPolled: number;
 }
 
-export type ListEvent = NewTweetEvent | MemberAddedEvent | MemberRemovedEvent | PolledTweetsEvent;
+export type TwitterListEvents = NewTweetEvent | MemberAddedEvent | MemberRemovedEvent | PolledTweetsEvent;
+
+export type TwitterListsEventsType = {
+  [TwitterListEvent.NewTweet]: NewTweetEvent;
+  [TwitterListEvent.MemberAdded]: MemberAddedEvent;
+  [TwitterListEvent.MemberRemoved]: MemberRemovedEvent;
+  [TwitterListEvent.PolledTweets]: PolledTweetsEvent;
+};
