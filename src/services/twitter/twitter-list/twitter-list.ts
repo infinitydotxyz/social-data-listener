@@ -15,6 +15,7 @@ import { ConfigListener } from '../../../models/config-listener.abstract';
 import { firestore } from '../../../container';
 import { FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { TwitterListEvent, TwitterListsEventsType } from './twitter-list.events';
+import { TwitterEndpoint } from '../client/twitter-client';
 
 export class TwitterList extends ConfigListener<ListConfig, TwitterListsEventsType & { docSnapshot: ListConfig }> {
   static ref(botAccount: BotAccount, listId: string): FirebaseFirestore.DocumentReference<ListConfig> {
@@ -41,10 +42,11 @@ export class TwitterList extends ConfigListener<ListConfig, TwitterListsEventsTy
 
   private get baseEvent() {
     return {
-      list: this.config.id,
+      list: this.config.name,
       account: this._botAccount.config.id,
       listSize: this.config.numMembers,
-      totalTweets: this.config.totalTweets
+      totalTweets: this.config.totalTweets,
+      addingRateLimitedUntil: this._botAccount.client.getEndpointRateLimitedUntil(TwitterEndpoint.AddMemberToList)
     };
   }
 

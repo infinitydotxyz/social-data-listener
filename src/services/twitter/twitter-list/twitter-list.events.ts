@@ -17,6 +17,8 @@ export interface TwitterListEventType {
   listSize: number;
 
   totalTweets: number;
+
+  addingRateLimitedUntil: number;
 }
 
 export interface NewTweetEvent extends TwitterListEventType {

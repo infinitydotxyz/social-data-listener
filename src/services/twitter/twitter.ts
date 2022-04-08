@@ -1,25 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { blockQuote } from '@discordjs/builders';
 import { Collection } from '@infinityxyz/lib/types/core/Collection';
 import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import chalk from 'chalk';
 import Listener, { OnEvent } from '../listener';
 import { BotAccountManager } from './bot-account-manager';
-import {
-  BotAccountManagerEvent,
-  BotAccountManagerEvents,
-  BotAccountManagerEventType
-} from './bot-account/bot-account-manager.events';
+import { BotAccountManagerEvent, BotAccountManagerEvents } from './bot-account/bot-account-manager.events';
 import { BotAccountEvent, BotAccountEvents } from './bot-account/bot-account.events';
 import ListAccountQueue from './list-account-queue';
 import { defaultTwitterConfig, TwitterConfig } from './twitter-config';
-import {
-  TwitterListEvent,
-  TwitterListEvents,
-  TwitterListEventType,
-  TwitterListsEventsType
-} from './twitter-list/twitter-list.events';
+import { TwitterListEvent, TwitterListEvents } from './twitter-list/twitter-list.events';
 import { TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
@@ -123,7 +113,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     }
     const color = logLevel === 'error' ? 'red' : 'cyan';
     message = message + chalk.blue(eventType);
-    console.log(chalk[color](message));
+    console.log(this.currentTime(), chalk[color](message));
   }
 
   private updateBotAccount(event: BotAccountEvents) {
@@ -149,11 +139,16 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     }
     const color = logLevel === 'error' ? 'red' : 'cyan';
     message = message + chalk.blue(eventType);
-    console.log(chalk[color](message));
+    console.log(this.currentTime(), chalk[color](message));
   }
 
   private updateTwitterList(event: TwitterListEvents) {
-    let message = `[Twitter List] [${event.list}] Members: ${event.listSize} Total Tweets: ${event.totalTweets}`;
+    const rateLimitMessage = `Rate Limited: ${
+      event.addingRateLimitedUntil > Date.now()
+        ? chalk.red('Yes ' + this.formatDuration(event.addingRateLimitedUntil - Date.now()))
+        : chalk.green('No')
+    }`;
+    let message = `[Twitter List] [${event.list}] Members: ${event.listSize} Total Tweets: ${event.totalTweets} ${rateLimitMessage}`;
     let logLevel = 'info';
     let eventType = '';
     switch (event.type) {
@@ -176,7 +171,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     }
     const color = logLevel === 'error' ? 'red' : 'cyan';
     message = message + chalk.blue(eventType);
-    console.log(chalk[color](message));
+    console.log(this.currentTime(), chalk[color](message));
   }
 
   private monitorTwitterLinks() {
@@ -236,5 +231,20 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
     const twitterConfig = new TwitterConfig(initConfig);
     return twitterConfig;
+  }
+
+  private formatDuration(duration: number) {
+    const seconds = Math.floor((duration / 1000) % 60);
+    const minutes = Math.floor((duration / 1000 / 60) % 60);
+    const hours = Math.floor((duration / 1000 / 60 / 60) % 24);
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  private currentTime() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    return `[${hours}:${minutes}:${seconds}]`;
   }
 }
