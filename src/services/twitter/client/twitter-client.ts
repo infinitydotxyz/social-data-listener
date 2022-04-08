@@ -16,7 +16,8 @@ import { V1AuthHelper } from './v1-auth-helper';
 
 const FIVE_MIN = 5 * 60 * 1000;
 const FIFTEEN_MIN = 15 * 60 * 1000;
-
+const ONE_HOUR = 60 * 60 * 1000;
+const MAX_BACK_OFF = 3 * ONE_HOUR;
 const MAX_REQUEST_ATTEMPTS = 3;
 
 enum TwitterEndpoint {
@@ -52,13 +53,15 @@ interface Endpoint {
 export enum TwitterClientEvent {
   RateLimitExceeded = 'rate-limit-exceeded',
   UnknownResponseError = 'unknown-response-error',
-  RefreshedToken = 'refreshed-token'
+  RefreshedToken = 'refreshed-token',
+  TokenRefreshError = 'token-refresh-error'
 }
 
 type TwitterClientEvents = {
   [TwitterClientEvent.RateLimitExceeded]: { url: string; rateLimitReset: number; rateLimitRemaining: number; expBackOff: number };
   [TwitterClientEvent.UnknownResponseError]: { endpoint: TwitterEndpoint; response: string };
   [TwitterClientEvent.RefreshedToken]: { expiresIn: number };
+  [TwitterClientEvent.TokenRefreshError]: Error;
 };
 
 export class TwitterClient extends Emittery<TwitterClientEvents> {
@@ -296,7 +299,6 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
         case 429:
           retry = true;
           const sleepFor = endpoint?.expBackOff ?? 10_000;
-          console.log(`Rate limited, sleeping for: ${sleepFor}`);
           await sleep(sleepFor);
           break;
 
@@ -339,7 +341,8 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
     if (response.statusCode === 429) {
       const prevBackOff = ep.expBackOff || 16_000;
-      const expBackOff = Math.min(2 * (prevBackOff / 1000)) * 1000;
+      let expBackOff = Math.min(2 * (prevBackOff / 1000)) * 1000;
+      expBackOff = expBackOff > MAX_BACK_OFF ? MAX_BACK_OFF : expBackOff;
       ep.expBackOff = expBackOff;
       void this.emit(TwitterClientEvent.RateLimitExceeded, {
         url: response.url || 'unknown',
@@ -370,7 +373,8 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       try {
         await this.refreshToken();
       } catch (err) {
-        console.error(`Failed to refresh token`, err);
+        const error = err instanceof Error ? err : new Error((err as any)?.toString?.());
+        void this.emit(TwitterClientEvent.TokenRefreshError, error);
       }
     };
 
@@ -380,9 +384,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
           await refresh();
         }, 60_000);
       })
-      .catch((err) => {
-        console.error('Failed to start token refresh', err);
-      });
+      .catch(console.error);
   }
 
   private get _tokenValid(): boolean {

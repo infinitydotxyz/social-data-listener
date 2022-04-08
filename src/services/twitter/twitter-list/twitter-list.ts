@@ -1,5 +1,5 @@
-import { socialDataFirestoreConstants } from '../../constants';
-import { BotAccount } from './bot-account';
+import { socialDataFirestoreConstants } from '../../../constants';
+import { BotAccount } from '../bot-account';
 import {
   ListConfig,
   Collection,
@@ -8,17 +8,15 @@ import {
   TweetMedia,
   Tweet,
   TwitterTweetEventPreCollectionData
-} from './twitter.types';
+} from '../twitter.types';
 import { sleep, trimLowerCase } from '@infinityxyz/lib/utils';
 import firebaseAdmin from 'firebase-admin';
-import { ConfigListener } from '../../models/config-listener.abstract';
-import { firestore } from '../../container';
+import { ConfigListener } from '../../../models/config-listener.abstract';
+import { firestore } from '../../../container';
 import { FeedEventType } from '@infinityxyz/lib/types/core/feed';
+import { ListEvent, TwitterListEvent } from './twitter-list.events';
 
-export class TwitterList extends ConfigListener<
-  ListConfig,
-  { docSnapshot: ListConfig; tweetEvent: TwitterTweetEventPreCollectionData }
-> {
+export class TwitterList extends ConfigListener<ListConfig, Record<TwitterListEvent, ListEvent> & { docSnapshot: ListConfig }> {
   static ref(botAccount: BotAccount, listId: string): FirebaseFirestore.DocumentReference<ListConfig> {
     const botAccountRef = BotAccount.ref(botAccount.config.username);
     const listRef = botAccountRef.collection(socialDataFirestoreConstants.TWITTER_ACCOUNT_LIST_COLL).doc(listId);
@@ -41,6 +39,15 @@ export class TwitterList extends ConfigListener<
     void this.processTweets();
   }
 
+  private get baseEvent() {
+    return {
+      list: this.config.id,
+      account: this._botAccount.config.id,
+      listSize: this.config.numMembers,
+      totalTweets: this.config.totalTweets
+    };
+  }
+
   /**
    * Returns the number of members in the list
    */
@@ -53,7 +60,6 @@ export class TwitterList extends ConfigListener<
   }
 
   public async addMemberToList(account: ListMember) {
-    console.log(`Adding member ${account.username} ${account.userId} to list ${this.config.id}`);
     const claimedAccount: ListMember = {
       ...account,
       addedToList: 'pending',
@@ -76,6 +82,12 @@ export class TwitterList extends ConfigListener<
       numMembers: firebaseAdmin.firestore.FieldValue.increment(1)
     });
     await batch.commit();
+
+    void this.emit(TwitterListEvent.MemberAdded, {
+      type: TwitterListEvent.MemberAdded,
+      ...this.baseEvent,
+      member: updatedAccount
+    });
   }
 
   public async removeMemberFromList(account: ListMember) {
@@ -94,15 +106,30 @@ export class TwitterList extends ConfigListener<
       numMembers: firebaseAdmin.firestore.FieldValue.increment(-1)
     });
     await batch.commit();
+
+    void this.emit(TwitterListEvent.MemberRemoved, { type: TwitterListEvent.MemberRemoved, ...this.baseEvent, member: account });
   }
 
   private async processTweets() {
     for (;;) {
       try {
         const hasNewTweets = await this.checkForTweets();
+        let tweetsFound = 0;
+        let tweetsPolled = 1; // Poll one tweet while checking
+        let pagesPolled = 0;
         if (hasNewTweets) {
-          await this.getNewTweets();
+          const response = await this.getNewTweets();
+          tweetsFound = response.tweetsFound;
+          tweetsPolled = tweetsPolled += response.tweetsPolled;
+          pagesPolled = response.pagesPolled;
         }
+        void this.emit(TwitterListEvent.PolledTweets, {
+          type: TwitterListEvent.PolledTweets,
+          ...this.baseEvent,
+          newTweetsFound: tweetsFound,
+          pagesPolled,
+          tweetsPolled
+        });
       } catch (err) {
         console.error('Failed to get tweets', err);
       }
@@ -112,8 +139,11 @@ export class TwitterList extends ConfigListener<
 
   private async checkForTweets() {
     const mostRecentTweetId = this.config.mostRecentTweetId;
-    const checkForNewTweets = await this._botAccount.client.getListTweets(this.config.id, '', 1);
-    const hasNewTweets = checkForNewTweets.data[0].id === mostRecentTweetId;
+    const response = await this._botAccount.client.getListTweets(this.config.id, '', 1);
+    const hasNewTweets = response?.data?.[0]?.id === mostRecentTweetId;
+    if (!response?.data) {
+      console.log(response);
+    }
     return hasNewTweets;
   }
 
@@ -127,11 +157,14 @@ export class TwitterList extends ConfigListener<
     const MAX_PAGES = Math.ceil(MAX_RESULTS / PAGE_SIZE);
     let cursor = '';
     let tweetsEmitted = 0;
+    let tweetsPolled = 0;
 
     while (shouldGetNextPage && page < MAX_PAGES) {
       page += 1;
       const response = await this._botAccount.client.getListTweets(this.config.id, cursor, PAGE_SIZE);
       const tweets: Tweet[] = response?.data ?? [];
+      tweetsPolled += tweets.length;
+
       const users: TwitterUser[] = response?.includes?.users ?? [];
       const usersMap = users.reduce(
         (acc: Record<string, TwitterUser>, user: TwitterUser) => ({
@@ -188,7 +221,7 @@ export class TwitterList extends ConfigListener<
           comments: 0,
           timestamp: new Date(tweet.created_at).getTime()
         };
-        void this.emit('tweetEvent', event);
+        void this.emit(TwitterListEvent.NewTweet, { type: TwitterListEvent.NewTweet, tweet: event, ...this.baseEvent });
         tweetsEmitted += 1;
       }
 
@@ -203,6 +236,12 @@ export class TwitterList extends ConfigListener<
       mostRecentTweetId: newMostRecentTweetId,
       totalTweets: firebaseAdmin.firestore.FieldValue.increment(tweetsEmitted)
     });
+
+    return {
+      tweetsFound: tweetsEmitted,
+      tweetsPolled,
+      pagesPolled: page
+    };
   }
 
   private getTweetLink(username: string, tweetId: string) {

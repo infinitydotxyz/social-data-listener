@@ -1,7 +1,7 @@
 import { socialDataFirestoreConstants } from '../../constants';
 import { BotAccount } from './bot-account';
 import { BotAccountConfig, Collection, ListMember, TwitterTweetEventPreCollectionData } from './twitter.types';
-import { TwitterList } from './twitter-list';
+import { TwitterList } from './twitter-list/twitter-list';
 import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
 import chalk from 'chalk';
@@ -37,8 +37,14 @@ export class BotAccountManager extends Emittery<{
       } else {
         await this.subscribeCollectionToNewUser(username, collection);
       }
-    } catch (err) {
-      console.error(`Failed to subscribe user: ${username} to collection: ${collection}`, err);
+    } catch (err: any) {
+      if (err?.toString?.()?.includes('Could not find user with username')) {
+        console.log(`Invalid username: ${username}`);
+      } else if (err?.toString?.()?.includes('User has been suspended')) {
+        console.log(`User has been suspended: ${username}`);
+      } else {
+        console.error(`Failed to subscribe user: ${username} to collection: ${collection}`, err);
+      }
     }
   }
 
