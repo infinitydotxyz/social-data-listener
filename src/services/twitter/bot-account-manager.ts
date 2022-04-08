@@ -10,11 +10,13 @@ import { firestoreConstants, getCollectionDocId, getInfinityLink, trimLowerCase 
 import ListAccountQueue from './list-account-queue';
 import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { Collection as CollectionDoc, InfinityLinkType } from '@infinityxyz/lib/types/core';
-import { BotAccountEvent } from './bot-account/bot-account.events';
+import { BotAccountEventsType } from './bot-account/bot-account.events';
+import { TwitterListEvent, TwitterListsEventsType } from './twitter-list/twitter-list.events';
+import { BotAccountManagerEvent, BotAccountManagerEventsType, SubscriptionError } from './bot-account/bot-account-manager.events';
 
-export class BotAccountManager extends Emittery<{
-  tweetEvent: TwitterTweetEvent;
-}> {
+export class BotAccountManager extends Emittery<
+  BotAccountManagerEventsType & BotAccountEventsType & TwitterListsEventsType & { docSnapshot: BotAccountConfig }
+> {
   private _botAccounts: Map<string, BotAccount> = new Map();
   private _isReady: Promise<void>;
 
@@ -38,14 +40,32 @@ export class BotAccountManager extends Emittery<{
       } else {
         await this.subscribeCollectionToNewUser(username, collection);
       }
+      void this.emit(BotAccountManagerEvent.Subscription, {
+        type: BotAccountManagerEvent.Subscription,
+        ...this.baseEvent,
+        username,
+        collection,
+        existingUserSubscriptions: Object.values(user.collections ?? {}).reduce((acc, curr) => {
+          return `${acc ? ', ' + acc : ''}${curr.chainId}:${curr.address}`;
+        }, '')
+      });
     } catch (err: any) {
+      let reason: SubscriptionError;
       if (err?.toString?.()?.includes('Could not find user with username')) {
-        console.log(`Invalid username: ${username}`);
+        reason = SubscriptionError.InvalidUsername;
       } else if (err?.toString?.()?.includes('User has been suspended')) {
-        console.log(`User has been suspended: ${username}`);
+        reason = SubscriptionError.UserSuspended;
       } else {
-        console.error(`Failed to subscribe user: ${username} to collection: ${collection}`, err);
+        reason = SubscriptionError.Unknown;
       }
+      void this.emit(BotAccountManagerEvent.ErroredSubscription, {
+        type: BotAccountManagerEvent.ErroredSubscription,
+        ...this.baseEvent,
+        username,
+        collection,
+        reason,
+        error: err?.toString?.()
+      });
     }
   }
 
@@ -68,6 +88,15 @@ export class BotAccountManager extends Emittery<{
       const collections = data.collections;
       delete collections[collectionKey];
       batch.update(subscription.ref, { collections });
+      void this.emit(BotAccountManagerEvent.UnSubscription, {
+        type: BotAccountManagerEvent.UnSubscription,
+        ...this.baseEvent,
+        username: data.username,
+        collection,
+        subscriptionsRemaining: Object.values(data.collections ?? {}).reduce((acc, curr) => {
+          return `${acc ? ', ' + acc : ''}${curr.chainId}:${curr.address}`;
+        }, '')
+      });
     }
     await batch.commit();
   }
@@ -179,11 +208,20 @@ export class BotAccountManager extends Emittery<{
               console.log('Bot account added', accountConfig.username);
               const botAccount = new BotAccount(accountConfig, this.twitterConfig, this._listAccountQueue, debug);
               this._botAccounts.set(accountConfig.username, botAccount);
-              botAccount.on(BotAccountEvent.Tweet, async (event) => {
-                try {
-                  await this.handleTweetEvent(event.tweet);
-                } catch (err) {
-                  console.error(err);
+              botAccount.onAny(async (eventName, data) => {
+                if ('type' in data) {
+                  switch (data.type) {
+                    case TwitterListEvent.NewTweet:
+                      try {
+                        await this.handleTweetEvent(data.tweet);
+                      } catch (err) {
+                        console.error(err);
+                      }
+                      break;
+
+                    default:
+                      void this.emit(eventName, data);
+                  }
                 }
               });
             }
@@ -260,8 +298,26 @@ export class BotAccountManager extends Emittery<{
           hasBlueCheck: collection.hasBlueCheck,
           internalUrl: getInfinityLink({ type: InfinityLinkType.Collection, addressOrSlug: collection.slug })
         };
-        void this.emit('tweetEvent', event);
+        void this.emit(BotAccountManagerEvent.Tweet, {
+          ...this.baseEvent,
+          type: BotAccountManagerEvent.Tweet,
+          tweet: event
+        });
       }
     }
+  }
+
+  private get baseEvent() {
+    let numLists = 0;
+    let totalTweets = 0;
+    this._botAccounts.forEach((account) => {
+      totalTweets = account.totalTweets;
+      numLists = account.numLists;
+    });
+    return {
+      accounts: this._botAccounts.size,
+      lists: numLists,
+      totalTweets
+    };
   }
 }

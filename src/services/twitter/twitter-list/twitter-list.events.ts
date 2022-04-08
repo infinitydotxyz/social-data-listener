@@ -1,10 +1,10 @@
 import { ListMember, TwitterTweetEventPreCollectionData } from '../twitter.types';
 
 export enum TwitterListEvent {
-  NewTweet = 'new-tweet',
-  MemberAdded = 'member-added',
-  MemberRemoved = 'member-removed',
-  PolledTweets = 'polled-tweets'
+  NewTweet = 'twitter-list-new-tweet',
+  MemberAdded = 'twitter-list-member-added',
+  MemberRemoved = 'twitter-list-member-removed',
+  PolledTweets = 'twitter-list-polled-tweets'
 }
 
 export interface ListEventType {

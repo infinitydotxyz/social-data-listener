@@ -1,13 +1,12 @@
-import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { BotAccountConfig, ListConfig } from '../twitter.types';
 
 export enum BotAccountEvent {
-  Loaded = 'loaded',
-  ListLoaded = 'list-loaded',
-  ListDeleted = 'list-deleted',
-  SubscribedUser = 'subscribed-user',
-  UnsubscribedUser = 'unsubscribed-user',
-  Tweet = 'tweet'
+  Loaded = 'bot-account-loaded',
+  ListLoaded = 'bot-account-list-loaded',
+  ListDeleted = 'bot-account-list-deleted',
+  SubscribedUser = 'bot-account-subscribed-user',
+  UnsubscribedUser = 'bot-account-unsubscribed-user',
+  Tweet = 'bot-account-tweet'
 }
 
 export interface BotAccountEventType {
@@ -37,17 +36,10 @@ export interface ListDeletedEvent extends BotAccountEventType {
   list?: ListConfig;
 }
 
-export interface TweetEvent extends BotAccountEventType {
-  type: BotAccountEvent.Tweet;
-
-  tweet: TwitterTweetEvent;
-}
-
-export type BotAccountEvents = BotAccountLoadedEvent | ListLoadedEvent | ListDeletedEvent | TweetEvent;
+export type BotAccountEvents = BotAccountLoadedEvent | ListLoadedEvent | ListDeletedEvent;
 
 export type BotAccountEventsType = {
   [BotAccountEvent.Loaded]: BotAccountLoadedEvent;
   [BotAccountEvent.ListLoaded]: ListLoadedEvent;
   [BotAccountEvent.ListDeleted]: ListDeletedEvent;
-  [BotAccountEvent.Tweet]: TweetEvent;
 };

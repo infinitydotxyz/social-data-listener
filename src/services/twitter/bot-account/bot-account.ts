@@ -72,6 +72,18 @@ export class BotAccount extends ConfigListener<
     return hasUsername && canRefresh && oAuthV1Ready && oAuthV2Ready;
   }
 
+  public get totalTweets() {
+    let totalTweets = 0;
+    this._lists.forEach((list) => {
+      totalTweets += list.size;
+    });
+    return totalTweets;
+  }
+
+  public get numLists() {
+    return this._lists.size;
+  }
+
   public async getUser(username: string) {
     const formattedUsername = username.toLowerCase();
 
@@ -115,15 +127,10 @@ export class BotAccount extends ConfigListener<
   }
 
   private get baseEvent() {
-    let totalTweets = 0;
-    this._lists.forEach((list) => {
-      totalTweets += list.size;
-    });
-
     return {
       account: this.config.username,
       numLists: this._lists.size,
-      totalTweets
+      totalTweets: this.totalTweets
     };
   }
 
