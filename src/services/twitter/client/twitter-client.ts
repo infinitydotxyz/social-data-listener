@@ -76,6 +76,25 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     this.keepTokenFresh();
   }
 
+  private get config() {
+    return this._config;
+  }
+
+  private set config(config: BotAccountConfig) {
+    if (this.saveConfig) {
+      this.saveConfig(config).catch((err) => {
+        console.error('failed to update bot account config', err);
+      });
+    }
+    this._config = config;
+  }
+
+  private get authHeaders() {
+    return {
+      Authorization: `Bearer ${this.config.accessTokenV2}`
+    };
+  }
+
   /**
    * Get a user object from twitter via a username
    */
@@ -237,45 +256,26 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     return response;
   }
 
-  private get config() {
-    return this._config;
-  }
-
-  private set config(config: BotAccountConfig) {
-    if (this.saveConfig) {
-      this.saveConfig(config).catch((err) => {
-        console.error('failed to update bot account config', err);
-      });
-    }
-    this._config = config;
-  }
-
-  private get authHeaders() {
-    return {
-      Authorization: `Bearer ${this.config.accessTokenV2}`
-    };
-  }
-
   private async requestHandler<Body>(
     request: () => Promise<phin.IResponse>,
-    endpoint: TwitterEndpoint,
+    endpointId: TwitterEndpoint,
     attempts = 0
   ): Promise<Body> {
-    let ep = this.endpoints.get(endpoint);
-    if (!ep) {
-      ep = this.getDefaultEndpoint();
-      this.endpoints.set(endpoint, ep);
+    let endpoint = this.endpoints.get(endpointId);
+    if (!endpoint) {
+      endpoint = this.getDefaultEndpoint();
+      this.endpoints.set(endpointId, endpoint);
     }
 
-    const { response, successful, shouldRetry } = await ep.queue.add(async () => {
-      if (ep?.rateLimitRemaining === 0 && ep?.rateLimitReset > Date.now()) {
-        const rateLimitResetIn = ep.rateLimitReset - Date.now();
+    const { response, successful, shouldRetry } = await endpoint.queue.add(async () => {
+      if (endpoint?.rateLimitRemaining === 0 && endpoint?.rateLimitReset > Date.now()) {
+        const rateLimitResetIn = endpoint.rateLimitReset - Date.now();
         await sleep(rateLimitResetIn);
       }
       const res = await request();
 
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      this.updateRateLimit(res, ep!);
+      this.updateRateLimit(res, endpoint!);
 
       let retry = false;
 
@@ -291,14 +291,14 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
         case 429:
           retry = true;
-          const sleepFor = ep?.expBackOff ?? 10_000;
+          const sleepFor = endpoint?.expBackOff ?? 10_000;
           console.log(`Rate limited, sleeping for: ${sleepFor}`);
           await sleep(sleepFor);
           break;
 
         default:
           void this.emit(TwitterClientEvent.UnknownResponseError, {
-            endpoint,
+            endpoint: endpointId,
             response: res.body.toString()
           });
       }
@@ -316,7 +316,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     if (attempts >= MAX_REQUEST_ATTEMPTS) {
       throw new Error(`Failed to make request in ${MAX_REQUEST_ATTEMPTS} attempts. Status Code: ${response.statusCode}`);
     } else if (shouldRetry) {
-      return this.requestHandler(request, endpoint, attempts + 1);
+      return this.requestHandler(request, endpointId, attempts + 1);
     } else {
       throw new Error(`Encountered unknown status code: ${response.statusCode} url: ${response.url}`);
     }
@@ -389,6 +389,11 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     return this.config.refreshTokenValidUntil > Date.now() + FIVE_MIN;
   }
 
+  /**
+   * Handles refreshing an OAuth2 token
+   * note - OAuth 1 tokens do not need to be refreshed they only become
+   * invalid if the user revokes them
+   */
   private async refreshToken(force?: boolean): Promise<void> {
     if (this._tokenValid && !force) {
       return;

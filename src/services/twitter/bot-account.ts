@@ -19,24 +19,6 @@ export class BotAccount extends ConfigListener<
     tweetEvent: { tweet: TwitterTweetEventPreCollectionData; botAccountId: string; listId: string };
   }
 > {
-  static ref(botAccountUsername: string) {
-    const accountRef = firestore
-      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
-      .doc(socialDataFirestoreConstants.TWITTER_DOC)
-      .collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL)
-      .doc(botAccountUsername) as FirebaseFirestore.DocumentReference<BotAccountConfig>;
-    return accountRef;
-  }
-
-  static validateConfig(config: BotAccountConfig): boolean {
-    const hasUsername = !!config.username;
-    const canRefresh = !!config.clientId && !!config.clientSecret;
-    const oAuthV1Ready = !!config.apiKey && !!config.apiKeySecret && !!config.accessTokenV1 && !!config.accessSecretV1;
-    const oAuthV2Ready = !!config.accessTokenV2 && !!config.refreshTokenV2;
-
-    return hasUsername && canRefresh && oAuthV1Ready && oAuthV2Ready;
-  }
-
   public client: TwitterClient;
   public isReady: Promise<void>;
 
@@ -66,6 +48,24 @@ export class BotAccount extends ConfigListener<
      * Start getting users from the queue and adding them to lists
      */
     void this.addUsersToLists();
+  }
+
+  static ref(botAccountUsername: string) {
+    const accountRef = firestore
+      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+      .doc(socialDataFirestoreConstants.TWITTER_DOC)
+      .collection(socialDataFirestoreConstants.TWITTER_ACCOUNTS_COLL)
+      .doc(botAccountUsername) as FirebaseFirestore.DocumentReference<BotAccountConfig>;
+    return accountRef;
+  }
+
+  static validateConfig(config: BotAccountConfig): boolean {
+    const hasUsername = !!config.username;
+    const canRefresh = !!config.clientId && !!config.clientSecret;
+    const oAuthV1Ready = !!config.apiKey && !!config.apiKeySecret && !!config.accessTokenV1 && !!config.accessSecretV1;
+    const oAuthV2Ready = !!config.accessTokenV2 && !!config.refreshTokenV2;
+
+    return hasUsername && canRefresh && oAuthV1Ready && oAuthV2Ready;
   }
 
   public async getUser(username: string) {

@@ -18,7 +18,6 @@ export type TwitterOptions = {
 
 /**
  * TODO validate that we don't have extra/missing members/collections
- * TODO monitor list tweets and save to db
  */
 export class Twitter extends Listener<TwitterTweetEvent> {
   private botAccountManager!: BotAccountManager;
@@ -83,7 +82,6 @@ export class Twitter extends Listener<TwitterTweetEvent> {
         switch (change.type) {
           case 'added':
           case 'modified':
-            // TODO: delete old account from the list when the twitter link is modified?
             this.botAccountManager
               .subscribeCollectionToUser(handle, {
                 chainId: collectionData.chainId,
@@ -92,6 +90,17 @@ export class Twitter extends Listener<TwitterTweetEvent> {
               .catch(console.error);
             break;
           case 'removed':
+            if (collectionData.chainId && collectionData.address) {
+              this.botAccountManager
+                .unsubscribeFromAll(
+                  {
+                    chainId: collectionData.chainId,
+                    address: collectionData.address
+                  },
+                  []
+                )
+                .catch(console.error);
+            }
             break;
         }
       }

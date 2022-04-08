@@ -14,16 +14,16 @@ import { Collection as CollectionDoc, InfinityLinkType } from '@infinityxyz/lib/
 export class BotAccountManager extends Emittery<{
   tweetEvent: TwitterTweetEvent;
 }> {
-  static getCollectionKey(collection: Collection) {
-    return `${collection.chainId}:${trimLowerCase(collection.address)}`;
-  }
-
   private _botAccounts: Map<string, BotAccount> = new Map();
-
   private isReady: Promise<void>;
+
   constructor(private twitterConfig: TwitterConfig, private _listAccountQueue: ListAccountQueue, debug = false) {
     super();
     this.isReady = this.initBotAccounts(debug);
+  }
+
+  static getCollectionKey(collection: Collection) {
+    return `${collection.chainId}:${trimLowerCase(collection.address)}`;
   }
 
   public async subscribeCollectionToUser(username: string, collection: Collection) {
@@ -42,7 +42,7 @@ export class BotAccountManager extends Emittery<{
     }
   }
 
-  private async unsubscribeFromAll(collection: Collection, except: Partial<ListMember>[] = []) {
+  public async unsubscribeFromAll(collection: Collection, except: Partial<ListMember>[] = []) {
     const exceptUserIds = new Set(except.map((user) => user.userId));
     const exceptHandles = new Set(except.map((user) => user.username?.toLowerCase()));
     const listMembersRef = firestore
