@@ -15,11 +15,11 @@ export class BotAccountManager extends Emittery<{
   tweetEvent: TwitterTweetEvent;
 }> {
   private _botAccounts: Map<string, BotAccount> = new Map();
-  private isReady: Promise<void>;
+  private _isReady: Promise<void>;
 
   constructor(private twitterConfig: TwitterConfig, private _listAccountQueue: ListAccountQueue, debug = false) {
     super();
-    this.isReady = this.initBotAccounts(debug);
+    this._isReady = this.initBotAccounts(debug);
   }
 
   static getCollectionKey(collection: Collection) {
@@ -27,7 +27,7 @@ export class BotAccountManager extends Emittery<{
   }
 
   public async subscribeCollectionToUser(username: string, collection: Collection) {
-    await this.isReady;
+    await this._isReady;
 
     try {
       const user = await this.getUser(username);
@@ -103,7 +103,7 @@ export class BotAccountManager extends Emittery<{
       listOwnerId: '',
       userId: user.id,
       collections: {
-        [`${collectionKey}`]: {
+        [collectionKey]: {
           chainId: collection.chainId,
           address: trimLowerCase(collection.address),
           addedAt: Date.now()

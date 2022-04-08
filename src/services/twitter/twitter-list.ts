@@ -99,8 +99,10 @@ export class TwitterList extends ConfigListener<
   private async processTweets() {
     for (;;) {
       try {
-        console.log(`Getting new Tweets: ${this.config.id}`);
-        await this.getNewTweets();
+        const hasNewTweets = await this.checkForTweets();
+        if (hasNewTweets) {
+          await this.getNewTweets();
+        }
       } catch (err) {
         console.error('Failed to get tweets', err);
       }
@@ -108,17 +110,27 @@ export class TwitterList extends ConfigListener<
     }
   }
 
+  private async checkForTweets() {
+    const mostRecentTweetId = this.config.mostRecentTweetId;
+    const checkForNewTweets = await this._botAccount.client.getListTweets(this.config.id, '', 1);
+    const hasNewTweets = checkForNewTweets.data[0].id === mostRecentTweetId;
+    return hasNewTweets;
+  }
+
   private async getNewTweets() {
     const mostRecentTweetId = this.config.mostRecentTweetId;
     let newMostRecentTweetId = '';
     let shouldGetNextPage = true;
     let page = 0;
-    const MAX_PAGES = 8; // Api is limited to 8 pages
+    const MAX_RESULTS = 800;
+    const PAGE_SIZE = 50;
+    const MAX_PAGES = Math.ceil(MAX_RESULTS / PAGE_SIZE);
     let cursor = '';
     let tweetsEmitted = 0;
+
     while (shouldGetNextPage && page < MAX_PAGES) {
       page += 1;
-      const response = await this._botAccount.client.getListTweets(this.config.id, cursor);
+      const response = await this._botAccount.client.getListTweets(this.config.id, cursor, PAGE_SIZE);
       const tweets: Tweet[] = response?.data ?? [];
       const users: TwitterUser[] = response?.includes?.users ?? [];
       const usersMap = users.reduce(

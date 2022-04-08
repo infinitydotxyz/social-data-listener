@@ -226,7 +226,7 @@ export class BotAccount extends ConfigListener<
   }
 
   private getNewListName() {
-    return v4().substring(0, 20);
+    return `infinity_xyz_${v4()}`.substring(0, 20);
   }
 
   private enableDebugging() {

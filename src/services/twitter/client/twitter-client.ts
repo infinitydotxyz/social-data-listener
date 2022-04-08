@@ -228,7 +228,7 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     };
   }
 
-  public async getListTweets(listId: string, cursor: string) {
+  public async getListTweets(listId: string, cursor: string, limit?: number) {
     const response = await this.requestHandler<ListTweetsResponse>(() => {
       const url = new URL(`https://api.twitter.com/2/lists/${listId}/tweets`);
       const params = new URLSearchParams({
@@ -242,6 +242,10 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
       if (cursor) {
         url.searchParams.append('pagination_token', cursor);
+      }
+
+      if (limit) {
+        url.searchParams.append('max_results', limit.toString());
       }
 
       return phin({
