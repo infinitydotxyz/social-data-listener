@@ -5,7 +5,7 @@ import firebaseAdmin from 'firebase-admin';
 import { ConfigListener } from '../../../models/config-listener.abstract';
 import { firestore } from '../../../container';
 import { TwitterConfig } from '../twitter-config';
-import { TwitterClient } from '../client/twitter-client';
+import { TwitterClient, TwitterEndpoint } from '../client/twitter-client';
 import { v4 } from 'uuid';
 import { BatchDebouncer } from '../../../models/batch-debouncer';
 import ListAccountQueue from '../list-account-queue';
@@ -75,13 +75,21 @@ export class BotAccount extends ConfigListener<
   public get totalTweets() {
     let totalTweets = 0;
     this._lists.forEach((list) => {
-      totalTweets += list.size;
+      totalTweets += list.tweets;
     });
     return totalTweets;
   }
 
   public get numLists() {
     return this._lists.size;
+  }
+
+  public get numMembers() {
+    let totalMembers = 0;
+    this._lists.forEach((list) => {
+      totalMembers += list.size;
+    });
+    return totalMembers;
   }
 
   public async getUser(username: string) {
@@ -130,7 +138,13 @@ export class BotAccount extends ConfigListener<
     return {
       account: this.config.username,
       numLists: this._lists.size,
-      totalTweets: this.totalTweets
+      totalTweets: this.totalTweets,
+      totalMembers: this.numMembers,
+      addMemberRateLimitedUntil: this.client.getEndpointRateLimitedUntil(TwitterEndpoint.AddMemberToList),
+      removeMemberRateLimitedUntil: this.client.getEndpointRateLimitedUntil(TwitterEndpoint.RemoveMemberFromList),
+      getTweetsRateLimitedUntil: this.client.getEndpointRateLimitedUntil(TwitterEndpoint.GetListTweets),
+      getUserRateLimitedUntil: this.client.getEndpointRateLimitedUntil(TwitterEndpoint.BatchedGetUser),
+      createListRateLimitedUntil: this.client.getEndpointRateLimitedUntil(TwitterEndpoint.CreateList)
     };
   }
 

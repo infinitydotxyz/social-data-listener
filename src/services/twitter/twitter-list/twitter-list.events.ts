@@ -7,7 +7,7 @@ export enum TwitterListEvent {
   PolledTweets = 'twitter-list-polled-tweets'
 }
 
-export interface ListEventType {
+export interface TwitterListEventType {
   type: TwitterListEvent;
 
   list: string;
@@ -19,13 +19,13 @@ export interface ListEventType {
   totalTweets: number;
 }
 
-export interface NewTweetEvent extends ListEventType {
+export interface NewTweetEvent extends TwitterListEventType {
   type: TwitterListEvent.NewTweet;
 
   tweet: TwitterTweetEventPreCollectionData;
 }
 
-export interface MemberEvent extends ListEventType {
+export interface MemberEvent extends TwitterListEventType {
   member: ListMember;
 }
 
@@ -37,7 +37,7 @@ export interface MemberRemovedEvent extends MemberEvent {
   type: TwitterListEvent.MemberRemoved;
 }
 
-export interface PolledTweetsEvent extends ListEventType {
+export interface PolledTweetsEvent extends TwitterListEventType {
   type: TwitterListEvent.PolledTweets;
 
   newTweetsFound: number;

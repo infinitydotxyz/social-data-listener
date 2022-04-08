@@ -55,6 +55,10 @@ export class TwitterList extends ConfigListener<ListConfig, TwitterListsEventsTy
     return this.config.numMembers;
   }
 
+  public get tweets() {
+    return this.config.totalTweets;
+  }
+
   public getCollectionKey(collection: Collection) {
     return `${collection.chainId}:${trimLowerCase(collection.address)}`;
   }
@@ -141,9 +145,6 @@ export class TwitterList extends ConfigListener<ListConfig, TwitterListsEventsTy
     const mostRecentTweetId = this.config.mostRecentTweetId;
     const response = await this._botAccount.client.getListTweets(this.config.id, '', 1);
     const hasNewTweets = response?.data?.[0]?.id === mostRecentTweetId;
-    if (!response?.data) {
-      console.log(response);
-    }
     return hasNewTweets;
   }
 

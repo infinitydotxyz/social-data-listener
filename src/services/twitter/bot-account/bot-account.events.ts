@@ -3,10 +3,7 @@ import { BotAccountConfig, ListConfig } from '../twitter.types';
 export enum BotAccountEvent {
   Loaded = 'bot-account-loaded',
   ListLoaded = 'bot-account-list-loaded',
-  ListDeleted = 'bot-account-list-deleted',
-  SubscribedUser = 'bot-account-subscribed-user',
-  UnsubscribedUser = 'bot-account-unsubscribed-user',
-  Tweet = 'bot-account-tweet'
+  ListDeleted = 'bot-account-list-deleted'
 }
 
 export interface BotAccountEventType {
@@ -16,7 +13,19 @@ export interface BotAccountEventType {
 
   numLists: number;
 
+  totalMembers: number;
+
   totalTweets: number;
+
+  addMemberRateLimitedUntil: number;
+
+  removeMemberRateLimitedUntil: number;
+
+  getTweetsRateLimitedUntil: number;
+
+  getUserRateLimitedUntil: number;
+
+  createListRateLimitedUntil: number;
 }
 
 export interface BotAccountLoadedEvent extends BotAccountEventType {

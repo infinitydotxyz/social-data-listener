@@ -4,7 +4,6 @@ import { BotAccountConfig, Collection, ListMember, TwitterTweetEventPreCollectio
 import { TwitterList } from './twitter-list/twitter-list';
 import { TwitterConfig } from './twitter-config';
 import { firestore } from '../../container';
-import chalk from 'chalk';
 import Emittery from 'emittery';
 import { firestoreConstants, getCollectionDocId, getInfinityLink, trimLowerCase } from '@infinityxyz/lib/utils';
 import ListAccountQueue from './list-account-queue';
@@ -195,7 +194,6 @@ export class BotAccountManager extends Emittery<
     }
     this.botAccountsInitialized = true;
     let resolved = false;
-    console.log(chalk.blue('Loading bot accounts...'));
     return new Promise((resolve) => {
       firestore
         .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
@@ -205,7 +203,6 @@ export class BotAccountManager extends Emittery<
           const addBotAccount = (accountConfig: BotAccountConfig) => {
             const isValidConfig = BotAccount.validateConfig(accountConfig);
             if (isValidConfig) {
-              console.log('Bot account added', accountConfig.username);
               const botAccount = new BotAccount(accountConfig, this.twitterConfig, this._listAccountQueue, debug);
               this._botAccounts.set(accountConfig.username, botAccount);
               botAccount.onAny(async (eventName, data) => {
@@ -233,7 +230,6 @@ export class BotAccountManager extends Emittery<
               const accountConfig = change.doc.data() as BotAccountConfig;
               addBotAccount(accountConfig);
             } else if (change.type === 'removed') {
-              console.log('Bot account removed', change.doc.id);
               this._botAccounts.delete(change.doc.id);
             } else if (change.type === 'modified') {
               const id = change.doc.id;
@@ -248,7 +244,6 @@ export class BotAccountManager extends Emittery<
             for (const [, botAccount] of this._botAccounts) {
               await botAccount.isReady;
             }
-            console.log(chalk.green(`Loaded: ${this._botAccounts.size} bot accounts`));
             resolve(); // Resolve once we have added at least one bot account
             resolved = true;
           }

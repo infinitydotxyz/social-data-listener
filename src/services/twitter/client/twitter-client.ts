@@ -3,7 +3,6 @@ import Emittery from 'emittery';
 import PQueue from 'p-queue';
 import phin from 'phin';
 import { TwitterApi } from 'twitter-api-v2';
-import { OAuth1RequestOptions } from 'twitter-api-v2/dist/client-mixins/oauth1.helper';
 import {
   BasicResponse,
   BotAccountConfig,
@@ -12,7 +11,6 @@ import {
   UserIdResponseData,
   UserNotFoundError
 } from '../twitter.types';
-import { V1AuthHelper } from './v1-auth-helper';
 
 const FIVE_MIN = 5 * 60 * 1000;
 const FIFTEEN_MIN = 15 * 60 * 1000;
@@ -20,17 +18,16 @@ const ONE_HOUR = 60 * 60 * 1000;
 const MAX_BACK_OFF = 3 * ONE_HOUR;
 const MAX_REQUEST_ATTEMPTS = 3;
 
-enum TwitterEndpoint {
-  GetUser = 'get-user',
+export enum TwitterEndpoint {
   BatchedGetUser = 'batched-get-user',
   CreateList = 'create-list',
   RemoveMemberFromList = 'remove-member-from-list',
   AddMemberToList = 'add-member-to-list',
-  GetListTweets = 'get-list-tweets',
-  BatchedAddMembersToList = 'batched-add-members-to-list'
+  GetListTweets = 'get-list-tweets'
 }
 
 interface Endpoint {
+  id: TwitterEndpoint;
   /**
    * Remaining window until the rate limit resets
    * UTC epoch ms
@@ -44,6 +41,7 @@ interface Endpoint {
 
   expBackOff: number;
 
+  rateLimitedUntil: number;
   /**
    * Request queue for the endpoint
    */
@@ -58,7 +56,7 @@ export enum TwitterClientEvent {
 }
 
 type TwitterClientEvents = {
-  [TwitterClientEvent.RateLimitExceeded]: { url: string; rateLimitReset: number; rateLimitRemaining: number; expBackOff: number };
+  [TwitterClientEvent.RateLimitExceeded]: { rateLimitedUntil: number; endpoint: TwitterEndpoint };
   [TwitterClientEvent.UnknownResponseError]: { endpoint: TwitterEndpoint; response: string };
   [TwitterClientEvent.RefreshedToken]: { expiresIn: number };
   [TwitterClientEvent.TokenRefreshError]: Error;
@@ -66,6 +64,11 @@ type TwitterClientEvents = {
 
 export class TwitterClient extends Emittery<TwitterClientEvents> {
   private endpoints: Map<TwitterEndpoint, Endpoint> = new Map();
+
+  public getEndpointRateLimitedUntil(id: TwitterEndpoint) {
+    const endpoint = this.endpoints.get(id);
+    return endpoint?.rateLimitedUntil ?? 0;
+  }
 
   /**
    * Allows an external client to update the credentials used
@@ -96,23 +99,6 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     return {
       Authorization: `Bearer ${this.config.accessTokenV2}`
     };
-  }
-
-  /**
-   * Get a user object from twitter via a username
-   */
-  public async getUser(username: string): Promise<UserIdResponseData> {
-    const response = await this.requestHandler<BasicResponse<UserIdResponseData>>(() => {
-      return phin({
-        method: 'GET',
-        url: `https://api.twitter.com/2/users/by/username/${username}`,
-        headers: {
-          ...this.authHeaders
-        }
-      });
-    }, TwitterEndpoint.GetUser);
-
-    return response.data;
   }
 
   public async getUsers(usernames: string[]): Promise<BasicResponse<UserIdResponseData[], UserNotFoundError | any>> {
@@ -152,31 +138,6 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
     return {
       isUserMember
     };
-  }
-
-  async addListMembers(listId: string, screenNames: string[]): Promise<any> {
-    const url = new URL('https://api.twitter.com/1.1/lists/members/create_all.json');
-    url.searchParams.set('list_id', listId);
-    url.searchParams.set('screen_name', screenNames.join(','));
-
-    const response = await this.requestHandler<any>(async () => {
-      const request: OAuth1RequestOptions = {
-        method: 'POST',
-        url: url.toString(),
-        data: {}
-      };
-      const authHelper = new V1AuthHelper(this.config);
-      const authHeaders = authHelper.getAuthHeader(this.config, request);
-      const response = await phin({
-        ...request,
-        headers: {
-          ...authHeaders
-        }
-      });
-      return response;
-    }, TwitterEndpoint.BatchedAddMembersToList);
-
-    return response;
   }
 
   /**
@@ -270,15 +231,16 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
   ): Promise<Body> {
     let endpoint = this.endpoints.get(endpointId);
     if (!endpoint) {
-      endpoint = this.getDefaultEndpoint();
+      endpoint = this.getDefaultEndpoint(endpointId);
       this.endpoints.set(endpointId, endpoint);
     }
 
     const { response, successful, shouldRetry } = await endpoint.queue.add(async () => {
-      if (endpoint?.rateLimitRemaining === 0 && endpoint?.rateLimitReset > Date.now()) {
-        const rateLimitResetIn = endpoint.rateLimitReset - Date.now();
-        await sleep(rateLimitResetIn);
+      const rateLimitedFor = (endpoint?.rateLimitedUntil ?? 0) - Date.now();
+      if (rateLimitedFor > 0) {
+        await sleep(rateLimitedFor);
       }
+
       const res = await request();
 
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -298,8 +260,6 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
 
         case 429:
           retry = true;
-          const sleepFor = endpoint?.expBackOff ?? 10_000;
-          await sleep(sleepFor);
           break;
 
         default:
@@ -344,27 +304,29 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       let expBackOff = Math.min(2 * (prevBackOff / 1000)) * 1000;
       expBackOff = expBackOff > MAX_BACK_OFF ? MAX_BACK_OFF : expBackOff;
       ep.expBackOff = expBackOff;
+      const rateLimitedFor = rateLimitRemaining === 0 ? ep.rateLimitReset : expBackOff;
+      ep.rateLimitedUntil = Date.now() + rateLimitedFor;
       void this.emit(TwitterClientEvent.RateLimitExceeded, {
-        url: response.url || 'unknown',
-        rateLimitRemaining,
-        rateLimitReset,
-        expBackOff
+        rateLimitedUntil: ep.rateLimitedUntil,
+        endpoint: ep.id
       });
     } else {
       ep.expBackOff = 0;
     }
   }
 
-  private getDefaultEndpoint(): Endpoint {
+  private getDefaultEndpoint(id: TwitterEndpoint): Endpoint {
     return {
-      rateLimitRemaining: 300,
+      rateLimitRemaining: 300, // TODO look over these
       rateLimitReset: FIFTEEN_MIN,
+      rateLimitedUntil: 0,
       queue: new PQueue({
         concurrency: 1,
         interval: 3000,
         intervalCap: 1
       }),
-      expBackOff: 0
+      expBackOff: 0,
+      id
     };
   }
 
