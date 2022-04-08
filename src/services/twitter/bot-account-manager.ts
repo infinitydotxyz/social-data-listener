@@ -30,8 +30,8 @@ export class BotAccountManager extends Emittery<{
     await this.isReady;
 
     try {
-      // TODO get collection's current subscription and unsubscribe
       const user = await this.getUser(username);
+      await this.unsubscribeFromAll(collection, [user]);
       if (user.addedToList && user.listId && user.listOwnerId) {
         await this.subscribeCollectionToExistingUser(user as ListMember, collection);
       } else {
@@ -40,6 +40,29 @@ export class BotAccountManager extends Emittery<{
     } catch (err) {
       console.error(`Failed to subscribe user: ${username} to collection: ${collection}`, err);
     }
+  }
+
+  private async unsubscribeFromAll(collection: Collection, except: Partial<ListMember>[] = []) {
+    const exceptUserIds = new Set(except.map((user) => user.userId));
+    const exceptHandles = new Set(except.map((user) => user.username?.toLowerCase()));
+    const listMembersRef = firestore
+      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+      .doc(socialDataFirestoreConstants.TWITTER_DOC)
+      .collection(socialDataFirestoreConstants.TWITTER_LIST_MEMBERS_COLL);
+    const collectionKey = BotAccountManager.getCollectionKey(collection);
+    const subscriptionsSnapshot = await listMembersRef.where(`collections.${collectionKey}.addedAt`, '>', 0).get();
+
+    const batch = firestore.batch();
+    for (const subscription of subscriptionsSnapshot.docs) {
+      const data = subscription.data() as ListMember;
+      if (exceptUserIds.has(data.userId) || exceptHandles.has(data.username?.toLowerCase())) {
+        continue;
+      }
+      const collections = data.collections;
+      delete collections[collectionKey];
+      batch.update(subscription.ref, { collections });
+    }
+    await batch.commit();
   }
 
   private async subscribeCollectionToExistingUser(user: ListMember, collection: Collection) {
