@@ -258,6 +258,10 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
           retry = true;
           break;
 
+        case 403:
+          retry = false;
+          break;
+
         case 429:
           retry = true;
           break;
@@ -303,13 +307,22 @@ export class TwitterClient extends Emittery<TwitterClientEvents> {
       const prevBackOff = ep.expBackOff || 16_000;
       let expBackOff = Math.min(2 * (prevBackOff / 1000)) * 1000;
       expBackOff = expBackOff > MAX_BACK_OFF ? MAX_BACK_OFF : expBackOff;
-      ep.expBackOff = expBackOff;
+      if (ep.id === TwitterEndpoint.AddMemberToList) {
+        expBackOff = MAX_BACK_OFF;
+      }
       const rateLimitedFor = rateLimitRemaining === 0 ? ep.rateLimitReset : expBackOff;
+      ep.expBackOff = expBackOff;
+
       ep.rateLimitedUntil = Date.now() + rateLimitedFor;
+
       void this.emit(TwitterClientEvent.RateLimitExceeded, {
         rateLimitedUntil: ep.rateLimitedUntil,
         endpoint: ep.id
       });
+    } else if (response.statusCode === 403) {
+      const rateLimitedFor = ONE_HOUR * 24;
+      ep.expBackOff = rateLimitedFor;
+      ep.rateLimitedUntil = Date.now() + rateLimitedFor;
     } else {
       ep.expBackOff = 0;
     }

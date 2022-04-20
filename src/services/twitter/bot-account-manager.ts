@@ -306,8 +306,8 @@ export class BotAccountManager extends Emittery<
     let numLists = 0;
     let totalTweets = 0;
     this._botAccounts.forEach((account) => {
-      totalTweets = account.totalTweets;
-      numLists = account.numLists;
+      totalTweets += account.totalTweets;
+      numLists += account.numLists;
     });
     return {
       accounts: this._botAccounts.size,

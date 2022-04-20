@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Collection } from '@infinityxyz/lib/types/core/Collection';
 import { TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
-import { firestoreConstants } from '@infinityxyz/lib/utils';
+import { firestoreConstants, sleep } from '@infinityxyz/lib/utils';
 import chalk from 'chalk';
+import { stringify } from 'uuid';
+import { socialDataFirestoreConstants } from '../../constants';
+import { firestore } from '../../container';
 import Listener, { OnEvent } from '../listener';
 import { BotAccountManager } from './bot-account-manager';
 import { BotAccountManagerEvent, BotAccountManagerEvents } from './bot-account/bot-account-manager.events';
@@ -10,7 +13,7 @@ import { BotAccountEvent, BotAccountEvents } from './bot-account/bot-account.eve
 import ListAccountQueue from './list-account-queue';
 import { defaultTwitterConfig, TwitterConfig } from './twitter-config';
 import { TwitterListEvent, TwitterListEvents } from './twitter-list/twitter-list.events';
-import { TwitterConfig as ITwitterConfig } from './twitter.types';
+import { ListMember, TwitterConfig as ITwitterConfig } from './twitter.types';
 
 export type TwitterOptions = {
   accessToken: string;
@@ -37,6 +40,9 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     this.listAccountQueue = new ListAccountQueue();
     const debug = false;
     this.botAccountManager = new BotAccountManager(this.twitterConfig, this.listAccountQueue, debug);
+    void this.requeueFailedAccounts();
+
+    void this.totalMembers();
   }
 
   /**
@@ -179,7 +185,6 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
     query.onSnapshot((snapshot) => {
       const changes = snapshot.docChanges();
-
       for (const change of changes) {
         // Skip collections w/o twitter url
         const collectionData = change.doc.data() as Partial<Collection>;
@@ -220,6 +225,100 @@ export class Twitter extends Listener<TwitterTweetEvent> {
         }
       }
     });
+  }
+
+  private async totalMembers() {
+    const listMembers = firestore
+      .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+      .doc(socialDataFirestoreConstants.TWITTER_DOC)
+      .collection(socialDataFirestoreConstants.TWITTER_LIST_MEMBERS_COLL);
+    const stream = listMembers.stream();
+    const botAccounts: Map<string, { numMembers: number }> = new Map();
+    const lists: Map<string, { numMembers: number }> = new Map();
+    const members: ListMember[] = [];
+
+    for await (const memberSnap of stream) {
+      const member = (memberSnap as any as FirebaseFirestore.DocumentSnapshot<ListMember>).data();
+      if (member) {
+        members.push(member);
+      }
+      if (member?.listOwnerId && !botAccounts.has(member?.listOwnerId)) {
+        botAccounts.set(member.listOwnerId, { numMembers: 0 });
+      }
+
+      if (member?.listId && !lists.has(member?.listId)) {
+        lists.set(member.listId, { numMembers: 0 });
+      }
+
+      if (member?.listOwnerId) {
+        const acc = botAccounts.get(member.listOwnerId);
+        if (acc) {
+          acc.numMembers += 1;
+        }
+      }
+
+      if (member?.listId) {
+        const acc = lists.get(member.listId);
+        if (acc) {
+          acc.numMembers += 1;
+        }
+      }
+    }
+
+    console.log(`Lists`);
+    let totalListMembers = 0;
+    for (const [key, value] of lists) {
+      console.log(key, value);
+      totalListMembers += value.numMembers;
+    }
+    console.log(`Total List Members: ${totalListMembers}`);
+
+    console.log(`Bot Accounts`);
+    let totalAccMembers = 0;
+    for (const [key, value] of botAccounts) {
+      console.log(key, value);
+      totalAccMembers += value.numMembers;
+    }
+    console.log(`Total Bot Account Members: ${totalAccMembers}`);
+
+    console.log(`Total Members: ${members.length}`);
+  }
+
+  private async requeueFailedAccounts() {
+    let numResults = 0;
+    const maxResults = 300;
+    const ONE_HOUR = 60 * 60 * 1000;
+    for (;;) {
+      try {
+        const listMembers = firestore
+          .collection(socialDataFirestoreConstants.SOCIAL_DATA_LISTENER_COLL)
+          .doc(socialDataFirestoreConstants.TWITTER_DOC)
+          .collection(socialDataFirestoreConstants.TWITTER_LIST_MEMBERS_COLL);
+        const TWENTY_EIGHT_HOURS = 1000 * 60 * 60 * 28;
+        const expired = Date.now() - TWENTY_EIGHT_HOURS;
+        const snapshot = await listMembers
+          .where('addedToList', '==', 'pending')
+          .where('pendingSince', '<=', expired)
+          .limit(maxResults)
+          .get();
+        const batch = firestore.batch();
+        snapshot.forEach((doc) => {
+          batch.update(doc.ref, { addedToList: 'queued' });
+        });
+
+        numResults = snapshot.docs.length;
+        await batch.commit();
+
+        console.log(`Re-queued ${numResults} accounts`);
+      } catch (err) {
+        console.log(`Failed to re-queue failed accounts`, err);
+        numResults = 0;
+      }
+
+      if (numResults < maxResults) {
+        await sleep(ONE_HOUR);
+      }
+    }
   }
 
   private async getTwitterConfig() {
