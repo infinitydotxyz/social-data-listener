@@ -1,12 +1,11 @@
 import { DiscordConfig } from './config';
 import { Client, Intents, TextChannel } from 'discord.js';
-import { DiscordIntegration } from '@infinityxyz/lib/types/core';
-import { Routes } from 'discord-api-types/v9';
-import { SlashCommandBuilder, SlashCommandSubcommandBuilder } from '@discordjs/builders';
-import { REST } from '@discordjs/rest';
+import { Collection, DiscordIntegration } from '@infinityxyz/lib/types/core';
 import { DiscordAttachment, DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import Listener, { OnEvent } from '../listener';
+import { registerCommands, verifyCommand, linkCommand } from './commands';
+import { SlashCommandStringOption } from '@discordjs/builders';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
@@ -19,29 +18,6 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
   }
 
   async setup() {}
-
-  /**
-   * Registers all available 'slash commands'.
-   */
-  private async registerCommands(guildId: string) {
-    const verifyCommand = new SlashCommandSubcommandBuilder()
-      .setName('verify')
-      .setDescription('Link this discord server to your NFT collection on infinity.xyz')
-      .addStringOption((option) => option.setName('address').setDescription('Collection contract address').setRequired(true));
-
-    const commands = [
-      new SlashCommandBuilder()
-        .setName('infinity')
-        .setDescription('Commands to integrate with infinity.xyz')
-        .addSubcommand(verifyCommand)
-    ];
-
-    const rest = new REST({ version: '9' }).setToken(this.config.token);
-
-    await rest.put(Routes.applicationGuildCommands(this.config.appId, guildId), {
-      body: commands.map((command) => command.toJSON())
-    });
-  }
 
   /**
    * Starts monitoring all discord channels this bot is connected to.
@@ -57,7 +33,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
 
     // fired when joining a new discord server
     client.on('guildCreate', async (guild) => {
-      await this.registerCommands(guild.id);
+      await registerCommands(guild, this.config);
     });
 
     client.on('interactionCreate', async (interaction) => {
@@ -65,26 +41,63 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
 
       const { commandName, options } = interaction;
 
-      if (commandName === 'infinity' && options.getSubcommand() === 'verify') {
-        const address = options.getString('address');
-        // TODO: Verify based on unique token instead of guild id (Slightly better security, though unlikely a collection owner is gonna input a wrong guild id to sabotage themselves. The collection address is already securely verified.)
+      if (commandName == verifyCommand.name) {
+        const address = options.getString((verifyCommand.options[0] as SlashCommandStringOption).name);
         interaction.reply(
           `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`
         );
+      } else if (commandName == linkCommand.name) {
+        const address = (linkCommand.options[0] as SlashCommandStringOption).name;
+        const guildId = (linkCommand.options[1] as SlashCommandStringOption).name;
+
+        const updateDocument = (document: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>) =>
+          document.update({ metadata: { integrations: { discord: { guildId } } } } as Collection, { exists: true });
+
+        let query = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
+
+        try {
+          // document id
+          if (address.includes(':')) {
+            await updateDocument(query.doc(address));
+          } else {
+            const collections = await Promise.all([
+              // TODO: performance?
+              query.where('slug', '==', address).get(),
+              query.where('metadata.name', '==', address).get()
+            ]);
+
+            for (const collection of collections) {
+              if (collection.size) {
+                for (const document of collection.docs) {
+                  await updateDocument(document.ref);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error(err);
+          interaction.reply('**Failed to link! See error log.**');
+        }
       }
     });
 
     client.on('message', async (msg) => {
+      const isMonitored =
+        msg.type != 'CHANNEL_FOLLOW_ADD' &&
+        msg.guildId == this.config.monitor.guildId &&
+        msg.channelId == this.config.monitor.channelId;
+
       const integrations = await this.db
         .collection(firestoreConstants.COLLECTIONS_COLL)
         .select('metadata.integrations.discord')
         .where('metadata.integrations.discord.guildId', '==', msg.guildId)
         .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
         .get();
-      if (integrations.size) {
+
+      if (isMonitored || integrations.size) {
         handler({
           id: msg.id,
-          guildId: msg.guildId!,
+          guildId: msg.reference?.guildId || msg.guildId!,
           authorId: msg.author.id,
           author: msg.author.username,
           content: msg.content,
@@ -102,7 +115,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
           type: FeedEventType.DiscordAnnouncement,
           comments: 0,
           likes: 0,
-          timestamp: Date.now()
+          timestamp: msg.createdTimestamp
         });
       }
     });

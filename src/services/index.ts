@@ -29,7 +29,17 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
   const discord = new Discord(
     {
       token: process.env.DISCORD_TOKEN!,
-      appId: process.env.DISCORD_APP_ID!
+      appId: process.env.DISCORD_APP_ID!,
+      monitor: {
+        guildId: process.env.DISCORD_MONITOR_SERVER_ID!,
+        channelId: process.env.DISCORD_MONITOR_SERVER_CHANNEL!
+      },
+      permissions: {
+        admin: {
+          roleIds: process.env.DISCORD_ADMIN_ROLES!.split(',').filter((v) => v.trim() != ''),
+          userIds: process.env.DISCORD_ADMIN_USERS!.split(',').filter((v) => v.trim() != '')
+        }
+      }
     },
     db
   );
@@ -44,8 +54,8 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
 
   const services = [
     // twitter,
-    discord,
-    coinmarketcap
+    discord
+    // coinmarketcap
   ];
 
   for (const service of services) {
