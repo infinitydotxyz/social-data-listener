@@ -40,9 +40,10 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
 
       if (commandName == verifyCommand.name) {
         const address = options.getString((verifyCommand.options[0] as SlashCommandStringOption).name);
-        interaction.reply(
-          `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`
-        );
+        interaction.reply({
+          content: `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`,
+          ephemeral: true
+        });
       } else if (commandName == linkCommand.name) {
         const address = (linkCommand.options[0] as SlashCommandStringOption).name;
         const guildId = (linkCommand.options[1] as SlashCommandStringOption).name;
