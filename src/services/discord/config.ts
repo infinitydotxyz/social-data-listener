@@ -1,27 +1,3 @@
-export interface Permissions {
-  /**
-   * IDs of users who are authorized to execute admin commands.
-   */
-  userIds: string[];
-
-  /**
-   * IDs of user roles that have the rights to execute admin commands.
-   */
-  roleIds: string[];
-}
-
-export interface Monitor {
-  /**
-   * Guild id of the server where the channel to monitor can be found.
-   */
-  guildId: string;
-
-  /**
-   * ID of the discord channel to automatically monitor for events
-   */
-  channelId: string;
-}
-
 export interface DiscordConfig {
   /**
    * Discord bot token.
@@ -34,19 +10,18 @@ export interface DiscordConfig {
   appId: string;
 
   /**
-   * Settings for the automatic monitoring of messages from announcement channels.
+   * ID of the guild where admin commands are available.
    *
-   * See: https://support.discord.com/hc/en-us/articles/360032008192-Announcement-Channels
+   * Please note that by default all admin commands have a permission of 0, meaning that only the server admin can access these unless configured otherwise.
+   *
+   * See: https://discord.com/blog/slash-commands-permissions-discord-apps-bots.
    */
-  monitor: Monitor;
+  adminGuildId: string;
 
   /**
-   * Contains details about who is authorized to execute which kind of commands.
+   * ID of the discord channel to use to monitor announcements from other discors servers.
+   *
+   * This channeld MUST exist within the admin guild!
    */
-  permissions: {
-    /**
-     * Access to administrator commands.
-     */
-    admin: Permissions;
-  };
+  adminMonitorChannelId: string;
 }

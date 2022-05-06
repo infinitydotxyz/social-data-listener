@@ -30,16 +30,8 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
     {
       token: process.env.DISCORD_TOKEN!,
       appId: process.env.DISCORD_APP_ID!,
-      monitor: {
-        guildId: process.env.DISCORD_MONITOR_SERVER_ID!,
-        channelId: process.env.DISCORD_MONITOR_SERVER_CHANNEL!
-      },
-      permissions: {
-        admin: {
-          roleIds: process.env.DISCORD_ADMIN_ROLES!.split(',').filter((v) => v.trim() != ''),
-          userIds: process.env.DISCORD_ADMIN_USERS!.split(',').filter((v) => v.trim() != '')
-        }
-      }
+      adminGuildId: process.env.DISCORD_ADMIN_SERVER_ID!,
+      adminMonitorChannelId: process.env.DISCORD_ADMIN_SERVER_MONITOR_CHANNEL!
     },
     db
   );

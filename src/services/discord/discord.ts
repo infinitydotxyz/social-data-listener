@@ -17,7 +17,9 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
     this.config = config;
   }
 
-  async setup() {}
+  async setup() {
+    await registerCommands(this.config);
+  }
 
   /**
    * Starts monitoring all discord channels this bot is connected to.
@@ -29,11 +31,6 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
 
     client.once('ready', () => {
       console.log('Started monitoring discord channels');
-    });
-
-    // fired when joining a new discord server
-    client.on('guildCreate', async (guild) => {
-      await registerCommands(guild, this.config);
     });
 
     client.on('interactionCreate', async (interaction) => {
@@ -84,8 +81,8 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
     client.on('message', async (msg) => {
       const isMonitored =
         msg.type != 'CHANNEL_FOLLOW_ADD' &&
-        msg.guildId == this.config.monitor.guildId &&
-        msg.channelId == this.config.monitor.channelId;
+        msg.guildId == this.config.adminGuildId &&
+        msg.channelId == this.config.adminMonitorChannelId;
 
       const integrations = await this.db
         .collection(firestoreConstants.COLLECTIONS_COLL)
