@@ -39,36 +39,42 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
       const { commandName, options } = interaction;
 
       if (commandName == verifyCommand.name) {
-        const address = options.getString((verifyCommand.options[0] as SlashCommandStringOption).name);
+        const address = options.getString((verifyCommand.options[0] as SlashCommandStringOption).name, true);
+
         interaction.reply({
           content: `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`,
           ephemeral: true
         });
       } else if (commandName == linkCommand.name) {
-        const address = (linkCommand.options[0] as SlashCommandStringOption).name;
-        const guildId = (linkCommand.options[1] as SlashCommandStringOption).name;
+        const nftCollection = options.getString((linkCommand.options[0] as SlashCommandStringOption).name, true);
+        const guildId = options.getString((linkCommand.options[1] as SlashCommandStringOption).name, true);
 
         const updateDocument = (document: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>) =>
-          document.update({ metadata: { integrations: { discord: { guildId } } } } as Collection, { exists: true });
+          document.update('metadata.integrations.discord.guildId', guildId);
 
         let query = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
 
+        let results: Collection[] = [];
+
         try {
           // document id
-          if (address.includes(':')) {
-            await updateDocument(query.doc(address));
+          if (nftCollection.includes(':')) {
+            const doc = query.doc(nftCollection);
+            await updateDocument(doc);
+            results.push((await doc.get()).data() as Collection);
           } else {
-            const collections = await Promise.all([
-              // TODO: performance?
-              query.where('slug', '==', address).get(),
-              query.where('metadata.name', '==', address).get()
-            ]);
+            const searchQueries = [query.where('slug', '==', nftCollection), query.where('metadata.name', '==', nftCollection)];
 
-            for (const collection of collections) {
-              if (collection.size) {
+            for (const searchQuery of searchQueries) {
+              const collection = await searchQuery.get();
+
+              if (collection.size > 0) {
                 for (const document of collection.docs) {
                   await updateDocument(document.ref);
+                  results.push((await document.data()) as Collection);
                 }
+
+                break;
               }
             }
           }
@@ -76,23 +82,42 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
           console.error(err);
           interaction.reply('**Failed to link! See error log.**');
         }
+
+        if (results.length > 0) {
+          interaction.reply(
+            `Linked discord server with ID \`${guildId}\` to collection \`${nftCollection}\` (${results
+              .map((c) => c.metadata.name)
+              .join(', ')}).`
+          );
+        } else {
+          interaction.reply('**Failed to find the NFT collection**');
+        }
       }
     });
 
     client.on('message', async (msg) => {
+      // automatically monitored by infinity
       const isMonitored =
         msg.type != 'CHANNEL_FOLLOW_ADD' &&
         msg.guildId == this.config.adminGuildId &&
         msg.channelId == this.config.adminMonitorChannelId;
 
-      const integrations = await this.db
-        .collection(firestoreConstants.COLLECTIONS_COLL)
-        .select('metadata.integrations.discord')
-        .where('metadata.integrations.discord.guildId', '==', msg.guildId)
-        .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
-        .get();
+      // integration enabled by collection owner
+      const isIntegrated =
+        isMonitored ||
+        (
+          await this.db
+            .collection(firestoreConstants.COLLECTIONS_COLL)
+            .select('metadata.integrations.discord')
+            .where('metadata.integrations.discord.guildId', '==', msg.guildId)
+            .where('metadata.integrations.discord.channels', 'array-contains-any', [
+              msg.channelId,
+              (msg.channel as TextChannel).name
+            ])
+            .get()
+        ).size > 0;
 
-      if (isMonitored || integrations.size) {
+      if (isMonitored || isIntegrated) {
         handler({
           id: msg.id,
           guildId: msg.reference?.guildId || msg.guildId!,
