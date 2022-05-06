@@ -19,7 +19,7 @@ export interface DiscordConfig {
   adminGuildId: string;
 
   /**
-   * ID of the discord channel to use to monitor announcements from other discors servers.
+   * ID of the discord channel to use to monitor announcements from other discord servers.
    *
    * This channeld MUST exist within the admin guild!
    */
