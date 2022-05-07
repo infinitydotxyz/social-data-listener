@@ -7,6 +7,7 @@ import { REST } from '@discordjs/rest';
 import { DiscordAttachment, DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import Listener, { OnEvent } from '../listener';
+import { DISCORD_VERIFICATION_URL } from '../../constants';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
@@ -69,7 +70,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
         const address = options.getString('address');
         // TODO: Verify based on unique token instead of guild id (Slightly better security, though unlikely a collection owner is gonna input a wrong guild id to sabotage themselves. The collection address is already securely verified.)
         interaction.reply(
-          `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`
+          `Please click here to verify: ${DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`
         );
       }
     });

@@ -3,6 +3,7 @@ import { getDb } from '../database';
 import { Discord } from './discord';
 import { Twitter } from './twitter';
 import { CoinMarketCap } from './coinmarketcap';
+import { DISCORD_APP_ID, DISCORD_TOKEN, TWITTER_BEARER_TOKEN } from '../constants';
 
 export type SocialFeedEvent = BaseFeedEvent & { id: string };
 
@@ -17,19 +18,15 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
 
   const twitter = new Twitter(
     {
-      apiKey: process.env.TWITTER_API_KEY!,
-      apiKeySecret: process.env.TWITTER_API_KEY_SECRET!,
-      bearerToken: process.env.TWITTER_BEARER_TOKEN,
-      accessToken: process.env.TWITTER_ACCESS_TOKEN,
-      accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
+      bearerToken: TWITTER_BEARER_TOKEN
     },
     db
   );
 
   const discord = new Discord(
     {
-      token: process.env.DISCORD_TOKEN!,
-      appId: process.env.DISCORD_APP_ID!
+      token: DISCORD_TOKEN,
+      appId: DISCORD_APP_ID
     },
     db
   );
