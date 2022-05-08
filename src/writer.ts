@@ -21,7 +21,7 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
 
       const snapshot = await query.get();
 
-      if (snapshot?.docs.length) {
+      if (snapshot.size) {
         for (const doc of snapshot.docs) {
           await db
             .collection(firestoreConstants.FEED_COLL)

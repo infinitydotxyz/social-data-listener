@@ -7,10 +7,12 @@
     "test": "jest",
     "prepare": "husky install",
     "build": "npm run update:lib && rimraf dist && tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/main.js",
     "start:dev": "ts-node src/main.ts",
     "watch": "nodemon src/main.ts",
-    "update:lib": "npm update @infinityxyz/lib"
+    "update:lib": "npm update @infinityxyz/lib",
+    "deploy:dev": "npm run build && gcloud app deploy --appyaml=./app.yaml --project=nftc-dev",
+    "deploy:prod": "npm run build && gcloud app deploy --appyaml=./app.yaml --project=nftc-infinity"
   },
   "keywords": [],
   "author": "",
