@@ -23,10 +23,17 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
 
       if (snapshot.size) {
         for (const doc of snapshot.docs) {
+          const data = doc.data();
           await db
             .collection(firestoreConstants.FEED_COLL)
             .doc(event.id)
-            .set({ collectionAddress: doc.data().address, ...event });
+            .set({
+              collectionAddress: data.address,
+              collectionName: data.metadata.name,
+              collectionSlug: data.slug,
+              collectionProfileImage: data.metadata.profileImage,
+              ...event
+            });
         }
       } else {
         console.warn('Event received but not added to the feed!');
