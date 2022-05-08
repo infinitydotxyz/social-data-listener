@@ -6,10 +6,11 @@
   "scripts": {
     "test": "jest",
     "prepare": "husky install",
-    "build": "rimraf dist && tsc",
+    "build": "npm run update:lib && rimraf dist && tsc",
     "start": "node dist/index.js",
     "start:dev": "ts-node src/main.ts",
-    "watch": "nodemon src/main.ts"
+    "watch": "nodemon src/main.ts",
+    "update:lib": "npm update @infinityxyz/lib"
   },
   "keywords": [],
   "author": "",
