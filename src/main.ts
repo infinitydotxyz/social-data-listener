@@ -1,4 +1,5 @@
 import { initDb } from './database';
+// todo: change for prod
 import serviceAccount from './database/creds/nftc-dev-firebase-creds.json';
 
 import { config as loadEnv } from 'dotenv';

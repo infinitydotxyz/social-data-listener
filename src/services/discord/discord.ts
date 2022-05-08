@@ -6,6 +6,7 @@ import { firestoreConstants } from '@infinityxyz/lib/utils';
 import Listener, { OnEvent } from '../listener';
 import { registerCommands, verifyCommand, linkCommand } from './commands';
 import { SlashCommandStringOption } from '@discordjs/builders';
+import { DISCORD_VERIFICATION_URL } from '../../constants';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
@@ -42,7 +43,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
         const address = options.getString((verifyCommand.options[0] as SlashCommandStringOption).name, true);
 
         interaction.reply({
-          content: `Please click here to verify: ${process.env.DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`,
+          content: `Please click here to verify: ${DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`,
           ephemeral: true
         });
       } else if (commandName == linkCommand.name) {
