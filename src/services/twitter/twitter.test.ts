@@ -1,4 +1,3 @@
-import { getDb } from '../../database';
 import { AccessLevel } from './config';
 import { Twitter } from './twitter';
 import { dbMock } from '../../test/mocks';
