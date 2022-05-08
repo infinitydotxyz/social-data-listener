@@ -41,7 +41,7 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
 
       break;
     case FeedEventType.CoinMarketCapNews:
-      // await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
+      await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
       break;
     default:
       throw new Error(`Unexpected event '${event.type}'!`);

@@ -3,7 +3,13 @@ import { getDb } from '../database';
 import { Discord } from './discord';
 import { Twitter } from './twitter';
 import { CoinMarketCap } from './coinmarketcap';
-import { DISCORD_APP_ID, DISCORD_TOKEN, TWITTER_BEARER_TOKEN } from '../constants';
+import {
+  DISCORD_ADMIN_SERVER_ID,
+  DISCORD_ADMIN_SERVER_MONITOR_CHANNEL,
+  DISCORD_APP_ID,
+  DISCORD_TOKEN,
+  TWITTER_BEARER_TOKEN
+} from '../constants';
 
 export type SocialFeedEvent = BaseFeedEvent & { id: string };
 
@@ -26,7 +32,9 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
   const discord = new Discord(
     {
       token: DISCORD_TOKEN,
-      appId: DISCORD_APP_ID
+      appId: DISCORD_APP_ID,
+      adminGuildId: DISCORD_ADMIN_SERVER_ID,
+      adminMonitorChannelId: DISCORD_ADMIN_SERVER_MONITOR_CHANNEL
     },
     db
   );
@@ -41,8 +49,8 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
 
   const services = [
     // twitter,
-    discord,
-    coinmarketcap
+    discord
+    // coinmarketcap
   ];
 
   for (const service of services) {
