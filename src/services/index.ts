@@ -3,6 +3,7 @@ import { getDb } from '../database';
 import { Discord } from './discord';
 import { Twitter } from './twitter';
 import { CoinMarketCap } from './coinmarketcap';
+import { CollectStatsTrigger } from './collect-stats-trigger';
 import {
   DISCORD_ADMIN_SERVER_ID,
   DISCORD_ADMIN_SERVER_MONITOR_CHANNEL,
@@ -47,10 +48,13 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
     db
   );
 
+  const collectStatsTrigger = new CollectStatsTrigger({}, db);
+
   const services = [
     // twitter,
-    discord
-    // coinmarketcap
+    discord,
+    // coinmarketcap,
+    collectStatsTrigger
   ];
 
   for (const service of services) {
