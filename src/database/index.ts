@@ -8,7 +8,7 @@ export function initDb(serviceAccount: any) {
     // @ts-ignore
     credential: firebaseAdmin.credential.cert(serviceAccount)
   });
-
+  firebaseAdmin.firestore().settings({ ignoreUndefinedProperties: true });
   return getDb();
 }
 
