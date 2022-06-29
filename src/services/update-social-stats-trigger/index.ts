@@ -56,6 +56,7 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
       const result = await query.limit(PAGE_SIZE).get();
       hasNextPage = result.docs.length === PAGE_SIZE;
       startAfter = getStartAfterField(result.docs[result.docs.length - 1].ref);
+      console.log('UpdateSocialStatsTrigger collections updated:', count);
 
       for (const doc of result.docs) {
         const docData = doc.data() as DocItem;
