@@ -4,15 +4,15 @@ import fetch from 'node-fetch';
 import { MAIN_API_URL } from '../../constants';
 
 const PAUSE_BETWEEN_CALLS = 5 * 1000; // 30s
-const STATS_BASE_URL = `${MAIN_API_URL}/collections/stats?`;
+const STATS_BASE_URL = `${MAIN_API_URL}/collections/stats`;
 
 const statsEndpoints = [
-  `${STATS_BASE_URL}&period=daily&queryBy=by_sales_volume`,
-  `${STATS_BASE_URL}&period=weekly&queryBy=by_sales_volume`,
-  `${STATS_BASE_URL}&period=monthly&queryBy=by_sales_volume`,
-  `${STATS_BASE_URL}&period=daily&queryBy=by_avg_price`,
-  `${STATS_BASE_URL}&period=weekly&queryBy=by_avg_price`,
-  `${STATS_BASE_URL}&period=monthly&queryBy=by_avg_price`
+  `${STATS_BASE_URL}?period=daily&queryBy=by_sales_volume`,
+  `${STATS_BASE_URL}?period=weekly&queryBy=by_sales_volume`,
+  `${STATS_BASE_URL}?period=monthly&queryBy=by_sales_volume`,
+  `${STATS_BASE_URL}?period=daily&queryBy=by_avg_price`,
+  `${STATS_BASE_URL}?period=weekly&queryBy=by_avg_price`,
+  `${STATS_BASE_URL}?period=monthly&queryBy=by_avg_price`
 ];
 
 export class TrendingStatsTrigger extends Listener<unknown> {
@@ -40,7 +40,7 @@ export class TrendingStatsTrigger extends Listener<unknown> {
         const url = statsEndpoints[i];
         fetch(url)
           .then(() => {
-            // console.log('called', url);
+            console.log('called', url);
           })
           .catch((err: any) => console.error(err));
       }, timer);

@@ -26,8 +26,8 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
     console.log(`Started UpdateSocialStatsTrigger`);
     this.run();
 
-    // runs every 24 hours
-    const job = schedule.scheduleJob('UpdateSocialStatsTrigger', '0 */24 * * *', async () => {
+    // runs every 12 hours
+    const job = schedule.scheduleJob('UpdateSocialStatsTrigger', '0 */12 * * *', async () => {
       console.log(`Scheduled job [${job.name}] started at ${job.nextInvocation().toISOString()}`);
       this.run();
     });
