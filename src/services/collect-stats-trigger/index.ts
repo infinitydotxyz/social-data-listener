@@ -3,7 +3,7 @@ import schedule from 'node-schedule';
 import { OrderDirection } from '@infinityxyz/lib/types/core';
 import { firestoreConstants } from '@infinityxyz/lib/utils/constants';
 import fetch from 'node-fetch';
-import { COLLECT_STATS_ENDPOINT } from '../../constants';
+import { UPDATE_SOCIAL_STATS_ENDPOINT } from '../../constants';
 
 const TRIGGER_TIMER = 1000; // every 1s
 const PAGE_SIZE = 100; // pagination
@@ -59,7 +59,7 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
       for (const doc of result.docs) {
         const docData = doc.data() as DocItem;
         if (docData.address) {
-          fetch(`${COLLECT_STATS_ENDPOINT}${docData.address}`)
+          fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${docData.address}`)
             .then(() => {
               // console.log('/update-social-stats', docData.address);
               count++;

@@ -9,6 +9,6 @@ export const DISCORD_VERIFICATION_URL = process.env.DISCORD_VERIFICATION_URL || 
 export const DISCORD_ADMIN_SERVER_ID = process.env.DISCORD_ADMIN_SERVER_ID || '972614311220494396';
 export const DISCORD_ADMIN_SERVER_MONITOR_CHANNEL = process.env.DISCORD_ADMIN_SERVER_MONITOR_CHANNEL || '972614995915460648';
 
-export const COLLECT_STATS_ENDPOINT = `${MAIN_SERVER_URL}/collections/update-social-stats?list=`;
+export const UPDATE_SOCIAL_STATS_ENDPOINT = `${MAIN_SERVER_URL}/collections/update-social-stats?list=`;
 
 export const NODE_ENV = process.env.NODE_ENV || 'dev';
