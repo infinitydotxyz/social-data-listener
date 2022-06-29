@@ -56,7 +56,7 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
     // twitter,
     discord,
     // coinmarketcap,
-    // updateSocialStatsTrigger,
+    updateSocialStatsTrigger,
     trendingStatsTrigger
   ];
 
