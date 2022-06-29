@@ -3,8 +3,9 @@ import schedule from 'node-schedule';
 import { OrderDirection } from '@infinityxyz/lib/types/core';
 import { firestoreConstants } from '@infinityxyz/lib/utils/constants';
 import fetch from 'node-fetch';
-import { UPDATE_SOCIAL_STATS_ENDPOINT } from '../../constants';
+import { MAIN_API_URL } from '../../constants';
 
+const UPDATE_SOCIAL_STATS_ENDPOINT = `${MAIN_API_URL}/collections/update-social-stats?list=`;
 const TRIGGER_TIMER = 1000; // every 1s
 const PAGE_SIZE = 100; // pagination
 
