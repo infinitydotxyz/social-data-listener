@@ -3,6 +3,8 @@ import { getDb } from '../database';
 import { Discord } from './discord';
 import { Twitter } from './twitter';
 import { CoinMarketCap } from './coinmarketcap';
+import { UpdateSocialStatsTrigger } from './update-social-stats-trigger';
+import { TrendingStatsTrigger } from './trending-stats-trigger';
 import {
   DISCORD_ADMIN_SERVER_ID,
   DISCORD_ADMIN_SERVER_MONITOR_CHANNEL,
@@ -47,10 +49,15 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
     db
   );
 
+  const updateSocialStatsTrigger = new UpdateSocialStatsTrigger({}, db);
+  const trendingStatsTrigger = new TrendingStatsTrigger({}, db);
+
   const services = [
     // twitter,
-    discord
-    // coinmarketcap
+    discord,
+    // coinmarketcap,
+    updateSocialStatsTrigger,
+    trendingStatsTrigger
   ];
 
   for (const service of services) {
