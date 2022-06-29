@@ -1,6 +1,6 @@
 export const TWITTER_BEARER_TOKEN = process.env.TWITTER_BEARER_TOKEN || 'CHANGEME';
 
-// http://localhost:9090
+// todo: adi: change this for release.
 export const MAIN_SERVER_URL = process.env.MAIN_SERVER_URL || 'https://dev.nftcompany.com';
 
 export const DISCORD_TOKEN = process.env.DISCORD_TOKEN || 'OTU2MjkyNDQwNzc4NzQzODM4.YjuGvA.-XvBeRtmXpVKXAG3W4Q0WKbNRtM';
@@ -9,6 +9,6 @@ export const DISCORD_VERIFICATION_URL = process.env.DISCORD_VERIFICATION_URL || 
 export const DISCORD_ADMIN_SERVER_ID = process.env.DISCORD_ADMIN_SERVER_ID || '972614311220494396';
 export const DISCORD_ADMIN_SERVER_MONITOR_CHANNEL = process.env.DISCORD_ADMIN_SERVER_MONITOR_CHANNEL || '972614995915460648';
 
-export const COLLECT_STATS_ENDPOINT = `${MAIN_SERVER_URL}/collections/collect-stats?list=`;
+export const COLLECT_STATS_ENDPOINT = `${MAIN_SERVER_URL}/collections/update-social-stats?list=`;
 
 export const NODE_ENV = process.env.NODE_ENV || 'dev';

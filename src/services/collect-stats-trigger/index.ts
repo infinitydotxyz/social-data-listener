@@ -14,8 +14,7 @@ type DocItem = {
 function sleep(duration: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, duration));
 }
-
-export class CollectStatsTrigger extends Listener<unknown> {
+export class UpdateSocialStatsTrigger extends Listener<unknown> {
   constructor({}, db: FirebaseFirestore.Firestore) {
     super(db);
   }
@@ -23,10 +22,11 @@ export class CollectStatsTrigger extends Listener<unknown> {
   async setup() {}
 
   async monitor(handler?: unknown) {
+    console.log(`Started UpdateSocialStatsTrigger`);
     this.run();
 
     // runs every 24 hours
-    const job = schedule.scheduleJob('CollectStatsTrigger', '0 */24 * * *', async () => {
+    const job = schedule.scheduleJob('UpdateSocialStatsTrigger', '0 */24 * * *', async () => {
       console.log(`Scheduled job [${job.name}] started at ${job.nextInvocation().toISOString()}`);
       this.run();
     });
@@ -61,14 +61,14 @@ export class CollectStatsTrigger extends Listener<unknown> {
         if (docData.address) {
           fetch(`${COLLECT_STATS_ENDPOINT}${docData.address}`)
             .then(() => {
-              console.log('/collect-stats', docData.address);
+              // console.log('/update-social-stats', docData.address);
+              count++;
             })
             .catch((err: any) => console.error(err));
           await sleep(TRIGGER_TIMER);
-          count++;
         }
       }
     }
-    console.log('Total collections:', count);
+    console.log('UpdateSocialStatsTrigger - Total collections updated:', count);
   }
 }
