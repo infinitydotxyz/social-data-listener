@@ -40,7 +40,7 @@ export class TrendingStatsTrigger extends Listener<unknown> {
         const url = statsEndpoints[i];
         fetch(url)
           .then(() => {
-            console.log('called', url);
+            // console.log('called', url);
           })
           .catch((err: any) => console.error(err));
       }, timer);
