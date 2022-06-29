@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 import { MAIN_API_URL } from '../../constants';
 
 const PAUSE_BETWEEN_CALLS = 5 * 1000; // 30s
-const STATS_BASE_URL = `${MAIN_API_URL}/collections/stats?limit=20&maxDate=9007199254740991&minDate=0&offset=0&orderDirection=desc`;
+const STATS_BASE_URL = `${MAIN_API_URL}/collections/stats?`;
 
 const statsEndpoints = [
   `${STATS_BASE_URL}&period=daily&queryBy=by_sales_volume`,
