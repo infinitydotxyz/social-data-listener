@@ -26,7 +26,7 @@ export class TrendingStatsTrigger extends Listener<unknown> {
     console.log(`Started TrendingStatsTrigger`);
     this.run();
 
-    // runs every 24 hours
+    // runs every 12 hours
     const job = schedule.scheduleJob('TrendingStatsTrigger', '0 */12 * * *', async () => {
       console.log(`Scheduled job [${job.name}] started at ${job.nextInvocation().toISOString()}`);
       this.run();
