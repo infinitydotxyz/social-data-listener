@@ -45,7 +45,6 @@
     "husky": "^7.0.4",
     "node-fetch": "^2.6.7",
     "node-schedule": "^2.1.0",
-    "p-queue": "^7.2.0",
     "phin": "^3.6.1",
     "twitter-api-v2": "^1.11.0"
   },
