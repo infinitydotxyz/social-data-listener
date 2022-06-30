@@ -8,8 +8,6 @@ import { Twitter } from './services/twitter';
  * @param event
  */
 export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Firestore) {
-  console.log(event);
-
   switch (event.type) {
     case FeedEventType.TwitterTweet:
     case FeedEventType.DiscordAnnouncement:
