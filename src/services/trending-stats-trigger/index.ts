@@ -41,7 +41,7 @@ export class TrendingStatsTrigger extends Listener<unknown> {
         const url = statsEndpoints[i];
         fetch(url, { method: 'PUT' })
           .then(() => {
-            console.log('fetched top collections stats', url);
+            console.log('Fetched top collections stats', url);
           })
           .catch((err: any) => console.error(err));
       }, timer);

@@ -60,7 +60,6 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
           if (docData.address) {
             fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${docData.address}`)
               .then(() => {
-                // console.log('updated social stats for', docData.address);
                 count++;
               })
               .catch((err: any) => console.error(err));
