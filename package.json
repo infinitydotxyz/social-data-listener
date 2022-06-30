@@ -12,6 +12,7 @@
     "prepare": "husky install",
     "build": "npm run update:lib && rimraf dist && tsc",
     "start": "node dist/main.js",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:dev": "ts-node src/main.ts",
     "watch": "nodemon src/main.ts",
     "update:lib": "npm update @infinityxyz/lib",
