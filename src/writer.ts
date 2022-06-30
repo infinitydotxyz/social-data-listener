@@ -34,14 +34,16 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
               collectionProfileImage: data.metadata.profileImage,
               ...event
             });
+          console.log(`${event.type} event added to feed`);
         }
       } else {
-        console.warn('Event received but not added to the feed!');
+        console.warn('Event received but not added to feed');
       }
 
       break;
     case FeedEventType.CoinMarketCapNews:
       await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
+      console.log(`${event.type} event added to feed`);
       break;
     default:
       throw new Error(`Unexpected event '${event.type}'!`);

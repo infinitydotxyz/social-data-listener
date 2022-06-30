@@ -37,39 +37,40 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
     const collectionRef = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
 
     let query = collectionRef.select('address').orderBy(
-      '__name__',
+      'address',
       OrderDirection.Ascending // orderBy is required to support pagination
     ) as FirebaseFirestore.Query<DocItem>;
 
-    const getStartAfterField = (ref: FirebaseFirestore.DocumentReference) => {
-      return [ref.id];
-    };
-
     let hasNextPage = true;
-    let startAfter: (string | number)[] | undefined = undefined;
+    let startAfter = '';
 
     let count = 0;
     while (hasNextPage) {
-      if (startAfter !== undefined) {
-        query = query.startAfter(...startAfter);
-      }
-      const result = await query.limit(PAGE_SIZE).get();
-      hasNextPage = result.docs.length === PAGE_SIZE;
-      startAfter = getStartAfterField(result.docs[result.docs.length - 1].ref);
-
-      for (const doc of result.docs) {
-        const docData = doc.data() as DocItem;
-        if (docData.address) {
-          fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${docData.address}`)
-            .then(() => {
-              // console.log('/update-social-stats', docData.address);
-              count++;
-            })
-            .catch((err: any) => console.error(err));
-          await sleep(TRIGGER_TIMER);
+      try {
+        console.log('Updating social stats for', PAGE_SIZE, 'collections', 'starting after', startAfter);
+        if (startAfter) {
+          query = query.startAfter(startAfter);
         }
+        const result = await query.limit(PAGE_SIZE).get();
+        hasNextPage = result.docs.length === PAGE_SIZE;
+        startAfter = result.docs[result.docs.length - 1].get('address');
+
+        for (const doc of result.docs) {
+          const docData = doc.data() as DocItem;
+          if (docData.address) {
+            fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${docData.address}`)
+              .then(() => {
+                // console.log('updated social stats for', docData.address);
+                count++;
+              })
+              .catch((err: any) => console.error(err));
+            await sleep(TRIGGER_TIMER);
+          }
+        }
+      } catch (err) {
+        console.error(err);
       }
+      console.log('UpdateSocialStatsTrigger - Total collections updated:', count);
     }
-    console.log('UpdateSocialStatsTrigger - Total collections updated:', count);
   }
 }
