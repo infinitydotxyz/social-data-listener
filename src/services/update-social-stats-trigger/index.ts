@@ -6,7 +6,7 @@ import fetch from 'node-fetch';
 import { MAIN_API_URL } from '../../constants';
 
 const UPDATE_SOCIAL_STATS_ENDPOINT = `${MAIN_API_URL}/collections/update-social-stats?list=`;
-const TRIGGER_TIMER = 1000; // every 1s
+const TRIGGER_TIMER = 3000; // every 3s - due to twitter api rate limit
 const PAGE_SIZE = 100; // pagination
 
 type DocItem = {
