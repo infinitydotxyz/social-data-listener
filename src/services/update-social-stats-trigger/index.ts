@@ -1,7 +1,7 @@
 import Listener from '../listener';
 import schedule from 'node-schedule';
-import { OrderDirection } from '@infinityxyz/lib/types/core';
-import { firestoreConstants } from '@infinityxyz/lib/utils/constants';
+import { OrderDirection, StatsPeriod } from '@infinityxyz/lib/types/core';
+import { firestoreConstants, TRENDING_COLLS_TTS } from '@infinityxyz/lib/utils/constants';
 import fetch from 'node-fetch';
 import { MAIN_API_URL } from '../../constants';
 
@@ -34,8 +34,11 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
   }
 
   async run() {
-    const collectionRef = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
+    // first update trending collections
+    await this.updateTrendingCollections();
 
+    // then update everything else
+    const collectionRef = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
     let query = collectionRef.select('address').orderBy(
       'address',
       OrderDirection.Ascending // orderBy is required to support pagination
@@ -70,6 +73,77 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
         console.error(err);
       }
       console.log('UpdateSocialStatsTrigger - Total collections updated:', count);
+    }
+  }
+
+  async updateTrendingCollections() {
+    console.log('Updating social stats for trending collections');
+    try {
+      const trendingCollectionsRef = this.db.collection(firestoreConstants.TRENDING_COLLECTIONS_COLL);
+      const trendingByVolumeDoc = trendingCollectionsRef.doc(firestoreConstants.TRENDING_BY_VOLUME_DOC);
+      const trendingByAvgPriceDoc = trendingCollectionsRef.doc(firestoreConstants.TRENDING_BY_AVG_PRICE_DOC);
+
+      const dailyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Daily);
+      const weeklyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Weekly);
+      const monthlyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Monthly);
+
+      const dailyTrendingByAvgPriceColl = trendingByAvgPriceDoc.collection(StatsPeriod.Daily);
+      const weeklyTrendingByAvgPriceColl = trendingByAvgPriceDoc.collection(StatsPeriod.Weekly);
+      const monthlyTrendingByAvgPriceColl = trendingByAvgPriceDoc.collection(StatsPeriod.Monthly);
+
+      const allTrendingCollections = new Set<string>();
+
+      const dailyTrendingByVolumeColls = await dailyTrendingByVolumeColl
+        .orderBy('salesVolume', 'desc')
+        .limit(100) // limit to top 100
+        .get();
+      dailyTrendingByVolumeColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
+
+      const weeklyTrendingByVolumeColls = await weeklyTrendingByVolumeColl
+        .orderBy('salesVolume', 'desc')
+        .limit(100) // limit to top 100
+        .get();
+      weeklyTrendingByVolumeColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
+
+      const monthlyTrendingByVolumeColls = await monthlyTrendingByVolumeColl
+        .orderBy('salesVolume', 'desc')
+        .limit(100) // limit to top 100
+        .get();
+      monthlyTrendingByVolumeColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
+
+      const dailyTrendingByAvgPriceColls = await dailyTrendingByAvgPriceColl
+        .orderBy('avgPrice', 'desc')
+        .limit(100) // limit to top 100
+        .get();
+      dailyTrendingByAvgPriceColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
+
+      const weeklyTrendingByAvgPriceColls = await weeklyTrendingByAvgPriceColl
+        .orderBy('avgPrice', 'desc')
+        .limit(100) // limit to top 100
+        .get();
+      weeklyTrendingByAvgPriceColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
+
+      const monthlyTrendingByAvgPriceColls = await monthlyTrendingByAvgPriceColl
+        .orderBy('avgPrice', 'desc')
+        .limit(100) // limit to top 100
+        .get();
+      monthlyTrendingByAvgPriceColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
+
+      let count = 0;
+      console.log('Num trending collections to update social stats for:', allTrendingCollections.size);
+      for (const collection of allTrendingCollections) {
+        if (collection) {
+          fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${collection}`)
+            .then(() => {
+              count++;
+            })
+            .catch((err: any) => console.error(err));
+          await sleep(TRIGGER_TIMER);
+        }
+      }
+      console.log('UpdateSocialStatsTrigger - Total trending collections updated:', count);
+    } catch (err) {
+      console.error('error updating social stats for trending collections', err);
     }
   }
 }
