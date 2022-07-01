@@ -16,8 +16,8 @@
     "start:dev": "ts-node src/main.ts",
     "watch": "nodemon src/main.ts",
     "update:lib": "npm update @infinityxyz/lib",
-    "deploy:dev": "npm run build && gcloud app deploy --appyaml=./app.yaml --project=nftc-dev",
-    "deploy:prod": "npm run build && gcloud app deploy --appyaml=./app.yaml --project=nftc-infinity"
+    "deploy:dev": "npm run build && gcloud app deploy -q --appyaml=./app.yaml --project=nftc-dev",
+    "deploy:prod": "npm run build && gcloud app deploy -q --appyaml=./app.yaml --project=nftc-infinity"
   },
   "keywords": [],
   "author": "",
