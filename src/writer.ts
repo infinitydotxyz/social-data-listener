@@ -1,4 +1,4 @@
-import { DiscordAnnouncementEvent, FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { DiscordAnnouncementEvent, EventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import { SocialFeedEvent } from './services';
 import { Twitter } from './services/twitter';
@@ -9,11 +9,11 @@ import { Twitter } from './services/twitter';
  */
 export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Firestore) {
   switch (event.type) {
-    case FeedEventType.TwitterTweet:
-    case FeedEventType.DiscordAnnouncement:
+    case EventType.TwitterTweet:
+    case EventType.DiscordAnnouncement:
       let query = db.collection(firestoreConstants.COLLECTIONS_COLL).select('address');
 
-      if (event.type === FeedEventType.TwitterTweet)
+      if (event.type === EventType.TwitterTweet)
         query = query.where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username));
       else query = query.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
 
@@ -39,7 +39,7 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
       }
 
       break;
-    case FeedEventType.CoinMarketCapNews:
+    case EventType.CoinMarketCapNews:
       await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
       console.log(`${event.type} event added to feed`);
       break;
