@@ -1,6 +1,6 @@
 export const TWITTER_BEARER_TOKEN = process.env.TWITTER_BEARER_TOKEN || 'CHANGEME';
 
-export const MAIN_API_URL = process.env.MAIN_SERVER_URL || 'https://sv-dev.nftcompany.com';
+export const MAIN_API_URL = process.env.MAIN_SERVER_URL || 'http://localhost:9090';
 
 export const DISCORD_TOKEN = process.env.DISCORD_TOKEN || 'OTU2MjkyNDQwNzc4NzQzODM4.YjuGvA.-XvBeRtmXpVKXAG3W4Q0WKbNRtM';
 export const DISCORD_APP_ID = process.env.DISCORD_APP_ID || '956292440778743838';
