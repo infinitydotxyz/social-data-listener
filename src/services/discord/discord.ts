@@ -72,7 +72,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
               if (collection.size > 0) {
                 for (const document of collection.docs) {
                   await updateDocument(document.ref);
-                  results.push((await document.data()) as Collection);
+                  results.push(document.data() as Collection);
                 }
 
                 break;
