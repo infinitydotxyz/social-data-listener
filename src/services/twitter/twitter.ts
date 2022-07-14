@@ -1,4 +1,4 @@
-import { FeedEventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
+import { EventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import { StreamingV2AddRulesParams, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
 import Listener, { OnEvent } from '../listener';
@@ -194,7 +194,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
       return handler({
         id: tweet.data.id,
-        type: FeedEventType.TwitterTweet,
+        type: EventType.TwitterTweet,
         authorId: tweet.data.author_id || '',
         authorProfileImage: user?.profile_image_url || '',
         authorName: user?.name || user?.username || '',

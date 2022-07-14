@@ -1,7 +1,7 @@
 import { DiscordConfig } from './config';
 import { Client, Intents, TextChannel } from 'discord.js';
 import { Collection, DiscordIntegration } from '@infinityxyz/lib/types/core';
-import { DiscordAttachment, DiscordAnnouncementEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
+import { DiscordAttachment, DiscordAnnouncementEvent, EventType } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import Listener, { OnEvent } from '../listener';
 import { registerCommands, verifyCommand, linkCommand } from './commands';
@@ -72,7 +72,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
               if (collection.size > 0) {
                 for (const document of collection.docs) {
                   await updateDocument(document.ref);
-                  results.push((await document.data()) as Collection);
+                  results.push(document.data() as Collection);
                 }
 
                 break;
@@ -136,7 +136,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
                 name: attachment.name
               } as DiscordAttachment)
           ),
-          type: FeedEventType.DiscordAnnouncement,
+          type: EventType.DiscordAnnouncement,
           comments: 0,
           likes: 0,
           timestamp: msg.createdTimestamp

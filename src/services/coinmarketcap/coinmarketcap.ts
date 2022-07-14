@@ -1,5 +1,5 @@
 import Listener, { OnEvent } from '../listener';
-import { CoinMarketCapNewsEvent, FeedEventType } from '@infinityxyz/lib/types/core/feed';
+import { CoinMarketCapNewsEvent, EventType } from '@infinityxyz/lib/types/core/feed';
 import { CoinMarketCapConfig } from './config';
 import phin from 'phin';
 import { DEFAULT_USER_AGENT } from '..';
@@ -23,7 +23,7 @@ export class CoinMarketCap extends Listener<CoinMarketCapNewsEvent> {
     // executes the job every hour (CMC seems to update their articles every hour as well so)
     // see: https://github.com/node-schedule/node-schedule#cron-style-scheduling
     // TODO: check which timezone CMC is using
-    const job = schedule.scheduleJob(FeedEventType.CoinMarketCapNews, '0 * * * *', async () => {
+    const job = schedule.scheduleJob(EventType.CoinMarketCapNews, '0 * * * *', async () => {
       const res = await phin({
         url: this.url,
         headers: {
@@ -49,7 +49,7 @@ export class CoinMarketCap extends Listener<CoinMarketCapNewsEvent> {
         const latestNewsItem = await this.db
           .collection(firestoreConstants.FEED_COLL)
           .select('id')
-          .where('type', '==', FeedEventType.CoinMarketCapNews)
+          .where('type', '==', EventType.CoinMarketCapNews)
           .orderBy('releasedAt', 'desc')
           .limit(1)
           .get();
@@ -67,7 +67,7 @@ export class CoinMarketCap extends Listener<CoinMarketCapNewsEvent> {
             comments: 0,
             likes: 0,
             timestamp: Date.now(),
-            type: FeedEventType.CoinMarketCapNews,
+            type: EventType.CoinMarketCapNews,
             createdAtCMC: newsItem.createdAt
           });
         }
