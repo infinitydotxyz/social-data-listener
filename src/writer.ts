@@ -1,3 +1,4 @@
+import { BaseCollection, Collection } from '@infinityxyz/lib/types/core';
 import { DiscordAnnouncementEvent, EventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import { SocialFeedEvent } from './services';
@@ -11,28 +12,34 @@ export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Fires
   switch (event.type) {
     case EventType.TwitterTweet:
     case EventType.DiscordAnnouncement:
-      let query = db.collection(firestoreConstants.COLLECTIONS_COLL).select('address');
-
-      if (event.type === EventType.TwitterTweet)
-        query = query.where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username));
-      else query = query.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
+      const collRef = db.collection(firestoreConstants.COLLECTIONS_COLL);
+      let query;
+      if (event.type === EventType.TwitterTweet) {
+        query = collRef.where('metadata.links.twitter', '==', Twitter.appendHandle((event as TwitterTweetEvent).username));
+      } else {
+        query = collRef.where('metadata.integrations.discord.guildId', '==', (event as DiscordAnnouncementEvent).guildId);
+      }
 
       const snapshot = await query.get();
 
       if (snapshot.size) {
         for (const doc of snapshot.docs) {
-          const data = doc.data();
-          await db
-            .collection(firestoreConstants.FEED_COLL)
-            .doc(event.id)
-            .set({
-              collectionAddress: data.address,
-              collectionName: data.metadata.name,
-              collectionSlug: data.slug,
-              collectionProfileImage: data.metadata.profileImage,
-              ...event
-            });
-          console.log(`${event.type} event added to feed`);
+          const data = doc.data() as BaseCollection;
+          if (data) {
+            await db
+              .collection(firestoreConstants.FEED_COLL)
+              .doc(event.id)
+              .set({
+                collectionAddress: data.address,
+                collectionName: data.metadata?.name,
+                collectionSlug: data.slug,
+                collectionProfileImage: data.metadata?.profileImage,
+                ...event
+              });
+            console.log(`${event.type} event added to feed`);
+          } else {
+            console.log(`${event.type} event not added to feed since data is null`);
+          }
         }
       } else {
         console.warn('Event received but not added to feed');
