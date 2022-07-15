@@ -1,13 +1,7 @@
 import { initDb } from './database';
 import serviceAccountDev from './database/creds/nftc-dev-firebase-creds.json';
 import serviceAccountProd from './database/creds/nftc-infinity-firebase-creds.json';
-
-// Try to load local environment variables from .env.
-// If the dotenv dependency is not installed (i.e in prod), then no environment variables will be loaded.
-try {
-  const { config: loadEnv } = require('dotenv');
-  loadEnv();
-} catch (err) {}
+import 'dotenv/config';
 
 import { startServices } from './services';
 import { writer as write } from './writer';
