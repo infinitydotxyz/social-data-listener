@@ -106,12 +106,12 @@ export class Twitter extends Listener<TwitterTweetEvent> {
       const slice = fromAccounts.slice(offset, i);
       const current = slice.join(concatenator);
 
-      if (placeholder.length + current.length > maxRuleLength) {
-        // set offset to index of the last item in the current slice.
+      if (placeholder.replace('()', `(${current})`).length > maxRuleLength) {
+        // set offset to the current end index.
         // this will make sure that, on the next iteration of the loop, we start with the item that we're now excluding.
-        offset = slice.length - 1;
+        offset = i - 1;
         // push the joined slice w/o the last item (which would exceed the max rule length otherwise) to the rules array
-        const previous = slice.slice(0, offset).join(concatenator);
+        const previous = slice.slice(0, slice.length - 1).join(concatenator);
         rules.push({ value: placeholder.replace('()', `(${previous})`) });
       }
     }

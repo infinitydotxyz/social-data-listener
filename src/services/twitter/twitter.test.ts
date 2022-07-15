@@ -1,6 +1,8 @@
 import { AccessLevel } from './config';
 import { Twitter } from './twitter';
 import { dbMock } from '../../test/mocks';
+import { ruleLengthLimitations } from './limitations';
+import { readFile } from 'fs/promises';
 
 test('should convert Twitter URL to handle', () => {
   const url = 'https://www.twitter.com/sleeyax';
@@ -50,6 +52,7 @@ test('should build stream rules from twitter accounts', () => {
   expect(rules.add[0].value).toBe(
     '(from:goatlodge OR from:BattleVerse_io OR from:chromorphs OR from:bullsontheblock OR from:JohnOrionYoung OR from:the_n_project_ OR from:superplastic OR from:PixlsOfficial OR from:LuckyManekiNFT OR from:TheProjectURS OR from:robotosNFT OR from:satoshibles OR from:SaconiGen OR from:FatalesNFT OR from:10KTFShop OR from:nahfungiblebone OR from:lostsoulsnft OR from:DropBearsio OR from:cryptoadzNFT OR from:MekaVerse OR from:boredapeyc OR from:pudgy_penguins OR from:worldofwomennft)'
   );
+  expect(rules.add[0].value.length).toBeLessThanOrEqual(ruleLengthLimitations[AccessLevel.Essential]);
 
   // push some more data in order to exceed length limit
   accounts.push('sleeyax');
@@ -61,4 +64,23 @@ test('should build stream rules from twitter accounts', () => {
   expect(rules.add.length).toBe(2);
   expect(rules.add[0].value.endsWith('sleeyax)')).toBe(true);
   expect(rules.add[1].value).toBe('(from:jfrazier OR from:elonmusk)');
+  expect(rules.add[1].value.length).toBeLessThanOrEqual(ruleLengthLimitations[AccessLevel.Essential]);
+
+  // test whether the default filter works as intended
+  rules = twitter.buildStreamRules(accounts, AccessLevel.Essential);
+
+  expect(rules.add.length).toBe(2);
+  expect(rules.add[0].value.length).toBeLessThanOrEqual(ruleLengthLimitations[AccessLevel.Essential]);
+  expect(rules.add[1].value.length).toBeLessThanOrEqual(ruleLengthLimitations[AccessLevel.Essential]);
+});
+
+test('shouldn\t exceed rule limits', async () => {
+  const twitter = new Twitter({ bearerToken: 'test' }, dbMock);
+  const accountsBuffer = await readFile('./test/accounts.json');
+
+  const rules = twitter.buildStreamRules(JSON.parse(accountsBuffer.toString()), AccessLevel.Essential);
+
+  for (const addedRule of rules.add) {
+    expect(addedRule.value.length).toBeLessThanOrEqual(ruleLengthLimitations[AccessLevel.Essential]);
+  }
 });
