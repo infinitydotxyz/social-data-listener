@@ -52,7 +52,7 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
   const updateSocialStatsTrigger = new UpdateSocialStatsTrigger({}, db);
   const trendingStatsTrigger = new TrendingStatsTrigger({}, db);
 
-  const services = [twitter, discord, coinmarketcap, updateSocialStatsTrigger, trendingStatsTrigger];
+  const services = [discord, coinmarketcap, updateSocialStatsTrigger, trendingStatsTrigger];
 
   for (const service of services) {
     await service.setup();
