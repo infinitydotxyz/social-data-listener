@@ -6,14 +6,12 @@ import { firestoreConstants } from '@infinityxyz/lib/utils';
 
 const PAUSE_BETWEEN_CALLS = 5 * 1000;
 const STATS_BASE_URL = `${MAIN_API_URL}/collections/update-trending-stats`;
+const TRENDING_STATS_TTS = 1000 * 60 * 60 * 20; // time to stale - 20 hrs
 
 const statsEndpoints = [
   `${STATS_BASE_URL}?period=daily&queryBy=by_sales_volume`,
   `${STATS_BASE_URL}?period=weekly&queryBy=by_sales_volume`,
-  `${STATS_BASE_URL}?period=monthly&queryBy=by_sales_volume`,
-  `${STATS_BASE_URL}?period=daily&queryBy=by_avg_price`,
-  `${STATS_BASE_URL}?period=weekly&queryBy=by_avg_price`,
-  `${STATS_BASE_URL}?period=monthly&queryBy=by_avg_price`
+  `${STATS_BASE_URL}?period=monthly&queryBy=by_sales_volume`
 ];
 
 export class TrendingStatsTrigger extends Listener<unknown> {
@@ -28,33 +26,37 @@ export class TrendingStatsTrigger extends Listener<unknown> {
     // run once
     this.run();
 
-    // then run every 5 hours
-    const job = schedule.scheduleJob('TrendingStatsTrigger', '0 */5 * * *', async () => {
+    // then run every 20 hours
+    const job = schedule.scheduleJob('TrendingStatsTrigger', '0 */20 * * *', async () => {
       console.log(`Scheduled job [${job.name}] started at ${job.nextInvocation().toISOString()}`);
       this.run();
     });
   }
 
   async run() {
-    // first delete old trending collections
-    await this.deleteOldTrendingCollections();
+    // first delete stale trending collections
+    const shouldFetchNew = await this.checkAndDeleteStaleTrendingCollections();
 
-    let timer = 0;
-    for (let i = 0; i < statsEndpoints.length; i++) {
-      setTimeout(() => {
-        const url = statsEndpoints[i];
-        fetch(url, { method: 'PUT' })
-          .then(() => {
-            console.log('Fetched top collections stats', url);
-          })
-          .catch((err: any) => console.error(err));
-      }, timer);
-      timer = PAUSE_BETWEEN_CALLS;
+    if (shouldFetchNew) {
+      let timer = 0;
+      for (let i = 0; i < statsEndpoints.length; i++) {
+        setTimeout(() => {
+          const url = statsEndpoints[i];
+          fetch(url, { method: 'PUT' })
+            .then(() => {
+              console.log('Fetched top collections stats', url);
+            })
+            .catch((err: any) => console.error(err));
+        }, timer);
+        timer = PAUSE_BETWEEN_CALLS;
+      }
+    } else {
+      console.log('No need to fetch new trending collections');
     }
   }
 
-  async deleteOldTrendingCollections() {
-    console.log('Deleting old trending collections');
+  async checkAndDeleteStaleTrendingCollections(): Promise<boolean> {
+    console.log('Checking and deleting stale trending collections');
     try {
       const MAX_RETRY_ATTEMPTS = 5;
       const bulkWriter = this.db.bulkWriter();
@@ -68,10 +70,16 @@ export class TrendingStatsTrigger extends Listener<unknown> {
       });
 
       const trendingCollectionsRef = this.db.collection(firestoreConstants.TRENDING_COLLECTIONS_COLL);
-      await this.db.recursiveDelete(trendingCollectionsRef, bulkWriter);
-      console.log('Deleted old trending collections');
+      const trendingCollectionsByVolumeDocRef = trendingCollectionsRef.doc(firestoreConstants.TRENDING_BY_VOLUME_DOC);
+      const lastUpdatedAt = (await trendingCollectionsByVolumeDocRef.get()).data()?.updatedAt;
+      if (Date.now() - lastUpdatedAt > TRENDING_STATS_TTS) {
+        await this.db.recursiveDelete(trendingCollectionsRef, bulkWriter);
+        console.log('Deleted old trending collections');
+        return true;
+      }
     } catch (err) {
       console.error('Failed deleting old trending collection', err);
     }
+    return false;
   }
 }
