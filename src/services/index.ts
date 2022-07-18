@@ -55,7 +55,11 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
   const services = [twitter, discord, coinmarketcap, updateSocialStatsTrigger, trendingStatsTrigger];
 
   for (const service of services) {
-    await service.setup();
+    try {
+      await service.setup();
+    } catch (err) {
+      console.error('Error starting service', service, err);
+    }
   }
 
   const monitors = services.map((service) => service.monitor(writer));
