@@ -75,6 +75,8 @@ export class TrendingStatsTrigger extends Listener<unknown> {
       if (Date.now() - lastUpdatedAt > TRENDING_STATS_TTS) {
         await this.db.recursiveDelete(trendingCollectionsRef, bulkWriter);
         console.log('Deleted old trending collections');
+        // add new updatedAt timestamp
+        await trendingCollectionsByVolumeDocRef.set({ updatedAt: Date.now() });
         return true;
       }
     } catch (err) {
