@@ -81,15 +81,10 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
     try {
       const trendingCollectionsRef = this.db.collection(firestoreConstants.TRENDING_COLLECTIONS_COLL);
       const trendingByVolumeDoc = trendingCollectionsRef.doc(firestoreConstants.TRENDING_BY_VOLUME_DOC);
-      const trendingByAvgPriceDoc = trendingCollectionsRef.doc(firestoreConstants.TRENDING_BY_AVG_PRICE_DOC);
 
       const dailyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Daily);
       const weeklyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Weekly);
       const monthlyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Monthly);
-
-      const dailyTrendingByAvgPriceColl = trendingByAvgPriceDoc.collection(StatsPeriod.Daily);
-      const weeklyTrendingByAvgPriceColl = trendingByAvgPriceDoc.collection(StatsPeriod.Weekly);
-      const monthlyTrendingByAvgPriceColl = trendingByAvgPriceDoc.collection(StatsPeriod.Monthly);
 
       const allTrendingCollections = new Set<string>();
 
@@ -110,24 +105,6 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
         .limit(100) // limit to top 100
         .get();
       monthlyTrendingByVolumeColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
-
-      const dailyTrendingByAvgPriceColls = await dailyTrendingByAvgPriceColl
-        .orderBy('avgPrice', 'desc')
-        .limit(100) // limit to top 100
-        .get();
-      dailyTrendingByAvgPriceColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
-
-      const weeklyTrendingByAvgPriceColls = await weeklyTrendingByAvgPriceColl
-        .orderBy('avgPrice', 'desc')
-        .limit(100) // limit to top 100
-        .get();
-      weeklyTrendingByAvgPriceColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
-
-      const monthlyTrendingByAvgPriceColls = await monthlyTrendingByAvgPriceColl
-        .orderBy('avgPrice', 'desc')
-        .limit(100) // limit to top 100
-        .get();
-      monthlyTrendingByAvgPriceColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
 
       let count = 0;
       console.log('Num trending collections to update social stats for:', allTrendingCollections.size);
