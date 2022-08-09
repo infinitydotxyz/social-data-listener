@@ -36,7 +36,7 @@ export async function startServices(writer: (event: SocialFeedEvent) => Promise<
       token: DISCORD_TOKEN,
       appId: DISCORD_APP_ID,
       adminGuildId: DISCORD_ADMIN_SERVER_ID,
-      adminMonitorChannelId: DISCORD_ADMIN_SERVER_MONITOR_CHANNEL
+      adminMonitorChannel: DISCORD_ADMIN_SERVER_MONITOR_CHANNEL
     },
     db
   );
