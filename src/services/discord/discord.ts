@@ -97,11 +97,13 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
     });
 
     client.on('message', async (msg) => {
+      const channel = msg.guild?.channels.cache.find((c) => c.id === msg.channelId);
+
       // automatically monitored by infinity
       const isMonitored =
         msg.type != 'CHANNEL_FOLLOW_ADD' &&
         msg.guildId == this.config.adminGuildId &&
-        msg.channelId == this.config.adminMonitorChannelId;
+        channel?.name.startsWith(this.config.adminMonitorChannel);
 
       // integration enabled by collection owner
       const isIntegrated =
