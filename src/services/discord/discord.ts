@@ -99,7 +99,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
     });
 
     client.on('messageCreate', async (msg) => {
-      console.log(msg);
+      console.log('Received discord announcement', JSON.stringify(msg));
 
       const channel = msg.guild?.channels.cache.find((c) => c.id === msg.channelId);
 
@@ -110,11 +110,18 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
         channel?.name.startsWith(this.config.adminMonitorChannel);
 
       // integration enabled by collection owner
-      const collectionData = await this.db
+      let collectionData = await this.db
         .collection(firestoreConstants.COLLECTIONS_COLL)
         .where('metadata.integrations.discord.guildId', '==', msg.guildId)
         .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
         .get();
+
+      if (collectionData.size == 0) {
+        collectionData = await this.db
+          .collection(firestoreConstants.COLLECTIONS_COLL)
+          .where('metadata.integrations.discord.guildId', '==', msg.reference?.guildId)
+          .get();
+      }
 
       let collectionName = '';
       let collectionSlug = '';
