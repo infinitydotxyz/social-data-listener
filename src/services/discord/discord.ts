@@ -106,21 +106,25 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
         channel?.name.startsWith(this.config.adminMonitorChannel);
 
       // integration enabled by collection owner
-      const isIntegrated =
-        isMonitored ||
-        (
-          await this.db
-            .collection(firestoreConstants.COLLECTIONS_COLL)
-            .select('metadata.integrations.discord')
-            .where('metadata.integrations.discord.guildId', '==', msg.guildId)
-            .where('metadata.integrations.discord.channels', 'array-contains-any', [
-              msg.channelId,
-              (msg.channel as TextChannel).name
-            ])
-            .get()
-        ).size > 0;
+      const collectionData = await this.db
+        .collection(firestoreConstants.COLLECTIONS_COLL)
+        .where('metadata.integrations.discord.guildId', '==', msg.guildId)
+        .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
+        .get();
 
-      if (isMonitored || isIntegrated) {
+      let collectionName = '';
+      let collectionSlug = '';
+      let collectionProfileImage = '';
+      if (collectionData.size > 0) {
+        const collection = collectionData.docs[0].data() as Collection;
+        collectionName = collection.metadata.name;
+        collectionSlug = collection.slug;
+        collectionProfileImage = collection.metadata.profileImage;
+      }
+
+      const isIntegrated = isMonitored || collectionData.size > 0;
+
+      if (isIntegrated) {
         handler({
           id: msg.id,
           guildId: msg.reference?.guildId || msg.guildId!,
@@ -141,7 +145,10 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
           type: EventType.DiscordAnnouncement,
           comments: 0,
           likes: 0,
-          timestamp: msg.createdTimestamp
+          timestamp: msg.createdTimestamp,
+          collectionName,
+          collectionSlug,
+          collectionProfileImage
         });
       }
     });
