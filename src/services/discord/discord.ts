@@ -1,5 +1,5 @@
 import { DiscordConfig } from './config';
-import { Client, Intents, TextChannel } from 'discord.js';
+import { Client, IntentsBitField, MessageType, TextChannel } from 'discord.js';
 import { Collection, DiscordIntegration } from '@infinityxyz/lib/types/core';
 import { DiscordAttachment, DiscordAnnouncementEvent, EventType } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
@@ -28,7 +28,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
    * Owners of verified collections are able to add this bot to their server.
    */
   async monitor(handler: OnEvent<DiscordAnnouncementEvent>) {
-    const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
+    const client = new Client({ intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages] });
 
     client.once('ready', () => {
       console.log('Started monitoring discord channels');
@@ -40,15 +40,17 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
       const { commandName, options } = interaction;
 
       if (commandName == verifyCommand.name) {
-        const address = options.getString((verifyCommand.options[0] as SlashCommandStringOption).name, true);
+        const address = options.get((verifyCommand.options[0] as SlashCommandStringOption).name, true);
 
         interaction.reply({
           content: `Please click here to verify: ${DISCORD_VERIFICATION_URL}collection/integration?type=discord&address=${address}&guildId=${interaction.guildId}`,
           ephemeral: true
         });
       } else if (commandName == linkCommand.name) {
-        const nftCollection = options.getString((linkCommand.options[0] as SlashCommandStringOption).name, true);
-        const guildId = options.getString((linkCommand.options[1] as SlashCommandStringOption).name, true);
+        const nftCollection = options.get((linkCommand.options[0] as SlashCommandStringOption).name, true).value?.toString();
+        const guildId = options.get((linkCommand.options[1] as SlashCommandStringOption).name, true).value?.toString();
+
+        if (!nftCollection) throw new Error('Nft collection unspecified!');
 
         const updateDocument = (document: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>) =>
           document.update('metadata.integrations.discord.guildId', guildId);
@@ -96,12 +98,14 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
       }
     });
 
-    client.on('message', async (msg) => {
+    client.on('messageCreate', async (msg) => {
+      console.log(msg);
+
       const channel = msg.guild?.channels.cache.find((c) => c.id === msg.channelId);
 
       // automatically monitored by infinity
       const isMonitored =
-        msg.type != 'CHANNEL_FOLLOW_ADD' &&
+        msg.type != MessageType.ChannelFollowAdd &&
         msg.guildId == this.config.adminGuildId &&
         channel?.name.startsWith(this.config.adminMonitorChannel);
 
