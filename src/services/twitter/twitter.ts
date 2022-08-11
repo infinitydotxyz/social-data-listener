@@ -15,7 +15,10 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   async setup(): Promise<void> {
-    const query = this.db.collection(firestoreConstants.COLLECTIONS_COLL).where('state.create.step', '==', 'complete');
+    const query = this.db
+      .collection(firestoreConstants.COLLECTIONS_COLL)
+      .where('state.create.step', '==', 'complete')
+      .limit(5000);
 
     await this.deleteStreamRules();
 
