@@ -108,7 +108,6 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
       // integration enabled by collection owner
       const collectionData = await this.db
         .collection(firestoreConstants.COLLECTIONS_COLL)
-        .select('metadata.integrations.discord')
         .where('metadata.integrations.discord.guildId', '==', msg.guildId)
         .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
         .get();
