@@ -6,7 +6,7 @@ import { firestoreConstants } from '@infinityxyz/lib/utils';
 import Listener, { OnEvent } from '../listener';
 import { registerCommands, verifyCommand, linkCommand } from './commands';
 import { SlashCommandStringOption } from '@discordjs/builders';
-import { DISCORD_VERIFICATION_URL } from '../../constants';
+import { DISCORD_VERIFICATION_URL, NODE_ENV } from '../../constants';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
@@ -101,7 +101,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
     });
 
     client.on('messageCreate', async (msg) => {
-      console.log('Received discord announcement', msg);
+      console.log('Received discord announcement', NODE_ENV === 'dev' ? msg : JSON.stringify(msg));
 
       const channel = msg.guild?.channels.cache.find((c) => c.id === msg.channelId);
 
