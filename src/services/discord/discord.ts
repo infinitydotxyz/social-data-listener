@@ -6,7 +6,7 @@ import { firestoreConstants } from '@infinityxyz/lib/utils';
 import Listener, { OnEvent } from '../listener';
 import { registerCommands, verifyCommand, linkCommand } from './commands';
 import { SlashCommandStringOption } from '@discordjs/builders';
-import { DISCORD_VERIFICATION_URL } from '../../constants';
+import { DISCORD_VERIFICATION_URL, NODE_ENV } from '../../constants';
 
 export const isDiscordIntegration = (item?: DiscordIntegration): item is DiscordIntegration => !!item;
 
@@ -28,7 +28,9 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
    * Owners of verified collections are able to add this bot to their server.
    */
   async monitor(handler: OnEvent<DiscordAnnouncementEvent>) {
-    const client = new Client({ intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages] });
+    const client = new Client({
+      intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.MessageContent]
+    });
 
     client.once('ready', () => {
       console.log('Started monitoring discord channels');
@@ -99,43 +101,39 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
     });
 
     client.on('messageCreate', async (msg) => {
-      console.log('Received discord announcement', JSON.stringify(msg));
+      console.log('Received discord announcement', NODE_ENV === 'dev' ? msg : JSON.stringify(msg));
 
       const channel = msg.guild?.channels.cache.find((c) => c.id === msg.channelId);
 
-      // automatically monitored by infinity
+      let collectionData: FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData>;
+
+      // whether the message was sent to an announcement channel in the 'Inifnity Discord Listener' server
       const isMonitored =
         msg.type != MessageType.ChannelFollowAdd &&
         msg.guildId == this.config.adminGuildId &&
         channel?.name.startsWith(this.config.adminMonitorChannel);
 
-      // integration enabled by collection owner
-      let collectionData = await this.db
-        .collection(firestoreConstants.COLLECTIONS_COLL)
-        .where('metadata.integrations.discord.guildId', '==', msg.guildId)
-        .where('metadata.integrations.discord.channels', 'array-contains-any', [msg.channelId, (msg.channel as TextChannel).name])
-        .get();
-
-      if (collectionData.size == 0) {
+      if (isMonitored) {
+        // integration enabled by Infinity mods
         collectionData = await this.db
           .collection(firestoreConstants.COLLECTIONS_COLL)
           .where('metadata.integrations.discord.guildId', '==', msg.reference?.guildId)
           .get();
+      } else {
+        // integration enabled by collection owner
+        collectionData = await this.db
+          .collection(firestoreConstants.COLLECTIONS_COLL)
+          .where('metadata.integrations.discord.guildId', '==', msg.guildId)
+          .where('metadata.integrations.discord.channels', 'array-contains-any', [
+            msg.channelId,
+            (msg.channel as TextChannel).name
+          ])
+          .get();
       }
 
-      let collectionName = '';
-      let collectionSlug = '';
-      let collectionProfileImage = '';
       if (collectionData.size > 0) {
         const collection = collectionData.docs[0].data() as Collection;
-        collectionName = collection.metadata.name;
-        collectionSlug = collection.slug;
-        collectionProfileImage = collection.metadata.profileImage;
-      }
 
-      const isIntegrated = isMonitored || collectionData.size > 0;
-
-      if (isIntegrated) {
         handler({
           id: msg.id,
           guildId: msg.reference?.guildId || msg.guildId!,
@@ -157,9 +155,9 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
           comments: 0,
           likes: 0,
           timestamp: msg.createdTimestamp,
-          collectionName,
-          collectionSlug,
-          collectionProfileImage
+          collectionName: collection.metadata?.name || '',
+          collectionSlug: collection.slug || '',
+          collectionProfileImage: collection.metadata?.profileImage || ''
         });
       }
     });
