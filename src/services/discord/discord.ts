@@ -28,7 +28,9 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
    * Owners of verified collections are able to add this bot to their server.
    */
   async monitor(handler: OnEvent<DiscordAnnouncementEvent>) {
-    const client = new Client({ intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages] });
+    const client = new Client({
+      intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.MessageContent]
+    });
 
     client.once('ready', () => {
       console.log('Started monitoring discord channels');
