@@ -7,6 +7,9 @@ import { startServices } from './services';
 import { writer as write } from './writer';
 import { NODE_ENV } from './constants';
 import { TwitterApiV2Settings } from 'twitter-api-v2';
+// This is a hack to make Multer available in the Express namespace
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Multer } from 'multer';
 
 // optionally enable twitter API debugging
 TwitterApiV2Settings.debug = !!process.env.DEBUG || false;
