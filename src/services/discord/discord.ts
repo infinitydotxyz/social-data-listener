@@ -118,6 +118,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
         collectionData = await this.db
           .collection(firestoreConstants.COLLECTIONS_COLL)
           .where('metadata.integrations.discord.guildId', '==', msg.reference?.guildId)
+          .limit(1)
           .get();
       } else {
         // integration enabled by collection owner
@@ -128,6 +129,7 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
             msg.channelId,
             (msg.channel as TextChannel).name
           ])
+          .limit(1)
           .get();
       }
 
@@ -155,9 +157,13 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
           comments: 0,
           likes: 0,
           timestamp: msg.createdTimestamp,
-          collectionName: collection.metadata?.name || '',
-          collectionSlug: collection.slug || '',
-          collectionProfileImage: collection.metadata?.profileImage || ''
+          collectionName: collection.metadata?.name ?? '',
+          collectionSlug: collection.slug ?? '',
+          collectionProfileImage: collection.metadata?.profileImage ?? '',
+          chainId: collection.chainId,
+          collectionAddress: collection.address,
+          hasBlueCheck: collection.hasBlueCheck ?? false,
+          internalUrl: ''
         });
       }
     });
