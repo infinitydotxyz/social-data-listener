@@ -207,6 +207,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
       try {
         const media = tweet.includes?.media?.[0];
         const user = tweet.includes?.users?.[0];
+        const username = (user?.username ?? '').toLowerCase();
         const collRef = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
         const event: TwitterTweetEvent = {
           id: tweet.data.id,
@@ -231,11 +232,11 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           image: media?.url ?? '',
           source: tweet.data.source ?? '',
           text: tweet.data.text ?? '',
-          username: user?.username ?? ''
+          username: username
         };
 
-        if (user?.username) {
-          let query = collRef.where('metadata.links.twitter', '==', Twitter.appendHandle(user?.username ?? ''));
+        if (username) {
+          let query = collRef.where('metadata.links.twitter', '==', Twitter.appendHandle(username));
 
           let snapshot = await query.where('hasBlueCheck', '==', true).limit(1).get();
           if (snapshot.size === 0) {
