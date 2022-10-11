@@ -1,3 +1,4 @@
+import { BaseCollection } from '@infinityxyz/lib/types/core';
 import { EventType, TwitterTweetEvent } from '@infinityxyz/lib/types/core/feed';
 import { firestoreConstants } from '@infinityxyz/lib/utils';
 import { StreamingV2AddRulesParams, TweetV2SingleStreamResult, TwitterApi } from 'twitter-api-v2';
@@ -149,7 +150,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   /**
-   * Set the twiter handles to watch for tweets.
+   * Set the twitter handles to watch for tweets.
    *
    * Please beware of rate limits! See link.
    *
@@ -202,37 +203,66 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   monitor(handler: OnEvent<TwitterTweetEvent>): void {
-    this.streamTweets((tweet) => {
-      const media = tweet.includes?.media?.[0];
-      const user = tweet.includes?.users?.[0];
+    this.streamTweets(async (tweet) => {
+      try {
+        const media = tweet.includes?.media?.[0];
+        const user = tweet.includes?.users?.[0];
+        const username = (user?.username ?? '').toLowerCase();
+        const collRef = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
+        const event: TwitterTweetEvent = {
+          id: tweet.data.id,
+          type: EventType.TwitterTweet,
+          authorId: tweet.data.author_id || '',
+          authorProfileImage: user?.profile_image_url || '',
+          authorName: user?.name || user?.username || '',
+          authorVerified: !!user?.verified,
+          chainId: '1',
+          collectionAddress: '',
+          collectionName: '',
+          collectionSlug: '',
+          collectionProfileImage: '',
+          externalLink: media?.url || '',
+          hasBlueCheck: false,
+          internalUrl: '',
+          comments: 0,
+          likes: 0,
+          isSensitive: !!tweet.data.possibly_sensitive,
+          language: tweet.data.lang ?? '',
+          timestamp: new Date(tweet.data.created_at ?? new Date()).getTime(),
+          image: media?.url ?? '',
+          source: tweet.data.source ?? '',
+          text: tweet.data.text ?? '',
+          username: username
+        };
 
-      return handler({
-        id: tweet.data.id,
-        type: EventType.TwitterTweet,
-        authorId: tweet.data.author_id || '',
-        authorProfileImage: user?.profile_image_url || '',
-        authorName: user?.name || user?.username || '',
-        authorVerified: !!user?.verified,
-        chainId: '1',
-        // these are set in writer.ts
-        collectionAddress: '',
-        collectionName: '',
-        collectionSlug: '',
-        collectionProfileImage: '',
-        // --
-        externalLink: media?.url || '',
-        hasBlueCheck: !!user?.verified,
-        internalUrl: '',
-        comments: 0,
-        likes: 0,
-        isSensitive: !!tweet.data.possibly_sensitive,
-        language: tweet.data.lang ?? '',
-        timestamp: new Date(tweet.data.created_at ?? new Date()).getTime(),
-        image: media?.url ?? '',
-        source: tweet.data.source ?? '',
-        text: tweet.data.text ?? '',
-        username: user?.username ?? ''
-      });
+        if (username) {
+          let query = collRef.where('metadata.links.twitter', '==', Twitter.appendHandle(username));
+
+          let snapshot = await query.where('hasBlueCheck', '==', true).limit(1).get();
+          if (snapshot.size === 0) {
+            snapshot = await query.limit(1).get();
+          }
+
+          const doc = snapshot.docs[0];
+
+          if (doc) {
+            const data = doc.data() as BaseCollection;
+            if (data) {
+              handler({
+                ...event,
+                collectionAddress: data.address,
+                collectionName: data.metadata?.name,
+                collectionSlug: data.slug,
+                collectionProfileImage: data.metadata?.profileImage,
+                chainId: data.chainId,
+                hasBlueCheck: data.hasBlueCheck ?? false
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
     });
   }
 }
