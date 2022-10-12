@@ -72,8 +72,9 @@ export class TrendingStatsTrigger extends Listener<unknown> {
       const trendingCollectionsRef = this.db.collection(firestoreConstants.TRENDING_COLLECTIONS_COLL);
       const trendingCollectionsByVolumeDocRef = trendingCollectionsRef.doc(firestoreConstants.TRENDING_BY_VOLUME_DOC);
       const lastUpdatedAt = (await trendingCollectionsByVolumeDocRef.get()).data()?.updatedAt;
-      if (Date.now() - lastUpdatedAt > TRENDING_STATS_TTS) {
+      if (typeof lastUpdatedAt !== 'number' || Date.now() - lastUpdatedAt > TRENDING_STATS_TTS) {
         await this.db.recursiveDelete(trendingCollectionsRef, bulkWriter);
+        await bulkWriter.flush();
         console.log('Deleted old trending collections');
         // add new updatedAt timestamp
         await trendingCollectionsByVolumeDocRef.set({ updatedAt: Date.now() });
