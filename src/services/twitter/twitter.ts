@@ -9,6 +9,8 @@ import { ruleLengthLimitations, ruleLimitations } from './limitations';
 export class Twitter extends Listener<TwitterTweetEvent> {
   private api: TwitterApi;
 
+  private handlesInStream: Set<string> = new Set();
+
   constructor(options: TwitterConfig, db: FirebaseFirestore.Firestore) {
     super(db);
     if (!options.bearerToken) throw new Error('Bearer token must be set!');
@@ -19,9 +21,12 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     const query = this.db
       .collection(firestoreConstants.COLLECTIONS_COLL)
       .where('state.create.step', '==', 'complete')
+      .where('metadata.links.twitter', '>', 'https://twitter.com/')
+      .where('hasBlueCheck', '==', true)
       .limit(5000);
 
     await this.deleteStreamRules();
+    this.handlesInStream = new Set();
 
     return new Promise((resolve, reject) => {
       const unsubscribe = query.onSnapshot(async (snapshot) => {
@@ -31,7 +36,8 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           const twitterHandlesAdded = changes
             .filter((change) => change.type === 'added' && change.doc.data().metadata?.links?.twitter)
             .map((change) => Twitter.extractHandle(change.doc.data().metadata.links.twitter))
-            .filter((handle) => !!handle.trim());
+            .filter((handle) => !!handle.trim())
+            .filter((handle) => !this.handlesInStream.has(handle));
 
           // TODO: properly handle 'modified' and 'removed' documents.
           // The problem is that we can't exactly delete or modify one exact rule because atm one rule monitors multiple accounts.
@@ -55,6 +61,9 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           if (twitterHandlesAdded.length) {
             console.log(`Monitoring ${twitterHandlesAdded.length} new twitter handles`);
             await this.updateStreamRules(twitterHandlesAdded);
+            for (const handle of twitterHandlesAdded) {
+              this.handlesInStream.add(handle);
+            }
           }
 
           resolve();
@@ -250,9 +259,9 @@ export class Twitter extends Listener<TwitterTweetEvent> {
             if (data) {
               handler({
                 ...event,
-                collectionAddress: data.address,
-                collectionName: data.metadata?.name,
-                collectionSlug: data.slug,
+                collectionAddress: data.address ?? '',
+                collectionName: data.metadata?.name ?? '',
+                collectionSlug: data.slug ?? '',
                 collectionProfileImage: data.metadata?.profileImage,
                 chainId: data.chainId,
                 hasBlueCheck: data.hasBlueCheck ?? false
