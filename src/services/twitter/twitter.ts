@@ -20,7 +20,6 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   async setup(): Promise<void> {
     const query = this.db
       .collection(firestoreConstants.COLLECTIONS_COLL)
-      .where('state.create.step', '==', 'complete')
       .where('metadata.links.twitter', '>', 'https://twitter.com/')
       .where('hasBlueCheck', '==', true)
       .limit(5000);
