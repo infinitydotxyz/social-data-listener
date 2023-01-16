@@ -6,7 +6,7 @@ import { DiscordConfig } from './config';
 
 export const verifyCommand = new SlashCommandBuilder()
   .setName('verify')
-  .setDescription('Link this discord server to your NFT collection on infinity.xyz')
+  .setDescription('Link this discord server to your NFT collection on flow.so')
   .addStringOption((option) => option.setName('address').setDescription('Collection contract address').setRequired(true))
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .setDMPermission(false);
