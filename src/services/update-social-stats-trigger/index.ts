@@ -1,7 +1,7 @@
 import Listener from '../listener';
 import schedule from 'node-schedule';
 import { OrderDirection, StatsPeriod } from '@infinityxyz/lib/types/core';
-import { firestoreConstants, TRENDING_COLLS_TTS } from '@infinityxyz/lib/utils/constants';
+import { firestoreConstants } from '@infinityxyz/lib/utils/constants';
 import fetch from 'node-fetch';
 import { MAIN_API_URL } from '../../constants';
 
