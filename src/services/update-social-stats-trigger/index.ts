@@ -1,6 +1,6 @@
 import Listener from '../listener';
 import schedule from 'node-schedule';
-import { OrderDirection, StatsPeriod } from '@infinityxyz/lib/types/core';
+import { OrderDirection, StatsPeriod, SupportedCollection } from '@infinityxyz/lib/types/core';
 import { firestoreConstants } from '@infinityxyz/lib/utils/constants';
 import fetch from 'node-fetch';
 import { MAIN_API_URL } from '../../constants';
@@ -35,80 +35,65 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
 
   async run() {
     // first update trending collections
-    await this.updateTrendingCollections();
+    await this.updateSupportedCollections();
+
+    // uncommenting this will update all collections in the db; will keep it commented for now
 
     // then update everything else
-    const collectionRef = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
-    let query = collectionRef.select('address').orderBy(
-      'address',
-      OrderDirection.Ascending // orderBy is required to support pagination
-    ) as FirebaseFirestore.Query<DocItem>;
+    // const collectionRef = this.db.collection(firestoreConstants.COLLECTIONS_COLL);
+    // let query = collectionRef.select('address').orderBy(
+    //   'address',
+    //   OrderDirection.Ascending // orderBy is required to support pagination
+    // ) as FirebaseFirestore.Query<DocItem>;
 
-    let hasNextPage = true;
-    let startAfter = '';
+    // let hasNextPage = true;
+    // let startAfter = '';
 
-    let count = 0;
-    while (hasNextPage) {
-      try {
-        console.log('Updating social stats for', PAGE_SIZE, 'collections', 'starting after', startAfter);
-        if (startAfter) {
-          query = query.startAfter(startAfter);
-        }
-        const result = await query.limit(PAGE_SIZE).get();
-        hasNextPage = result.docs.length === PAGE_SIZE;
-        startAfter = result.docs[result.docs.length - 1].get('address');
+    // let count = 0;
+    // while (hasNextPage) {
+    //   try {
+    //     console.log('Updating social stats for', PAGE_SIZE, 'collections', 'starting after', startAfter);
+    //     if (startAfter) {
+    //       query = query.startAfter(startAfter);
+    //     }
+    //     const result = await query.limit(PAGE_SIZE).get();
+    //     hasNextPage = result.docs.length === PAGE_SIZE;
+    //     startAfter = result.docs[result.docs.length - 1].get('address');
 
-        for (const doc of result.docs) {
-          const docData = doc.data() as DocItem;
-          if (docData.address) {
-            fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${docData.address}`)
-              .then(() => {
-                count++;
-              })
-              .catch((err: any) => console.error(err));
-            await sleep(TRIGGER_TIMER);
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
-      console.log('UpdateSocialStatsTrigger - Total collections updated:', count);
-    }
+    //     for (const doc of result.docs) {
+    //       const docData = doc.data() as DocItem;
+    //       if (docData.address) {
+    //         fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${docData.address}`)
+    //           .then(() => {
+    //             count++;
+    //           })
+    //           .catch((err: any) => console.error(err));
+    //         await sleep(TRIGGER_TIMER);
+    //       }
+    //     }
+    //   } catch (err) {
+    //     console.error(err);
+    //   }
+    //   console.log('UpdateSocialStatsTrigger - Total collections updated:', count);
+    // }
   }
 
-  async updateTrendingCollections() {
-    console.log('Updating social stats for trending collections');
+  async updateSupportedCollections() {
+    console.log('Updating social stats for supported collections');
     try {
-      const trendingCollectionsRef = this.db.collection(firestoreConstants.TRENDING_COLLECTIONS_COLL);
-      const trendingByVolumeDoc = trendingCollectionsRef.doc(firestoreConstants.TRENDING_BY_VOLUME_DOC);
+      const supportedCollectionsRef = this.db.collection(firestoreConstants.SUPPORTED_COLLECTIONS_COLL);
 
-      const dailyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Daily);
-      const weeklyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Weekly);
-      const monthlyTrendingByVolumeColl = trendingByVolumeDoc.collection(StatsPeriod.Monthly);
+      const allSupportedCollections = new Set<string>();
 
-      const allTrendingCollections = new Set<string>();
-
-      const dailyTrendingByVolumeColls = await dailyTrendingByVolumeColl
-        .orderBy('salesVolume', 'desc')
-        .limit(100) // limit to top 100
+      const supportedColls = await supportedCollectionsRef
+        .orderBy('address', 'asc')
+        .limit(1000) // future todo: change limit when we support more than 1000 colls
         .get();
-      dailyTrendingByVolumeColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
-
-      const weeklyTrendingByVolumeColls = await weeklyTrendingByVolumeColl
-        .orderBy('salesVolume', 'desc')
-        .limit(100) // limit to top 100
-        .get();
-      weeklyTrendingByVolumeColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
-
-      const monthlyTrendingByVolumeColls = await monthlyTrendingByVolumeColl
-        .orderBy('salesVolume', 'desc')
-        .limit(100) // limit to top 100
-        .get();
-      monthlyTrendingByVolumeColls.docs.map((doc) => allTrendingCollections.add(doc.data().contractAddress));
+      supportedColls.docs.map((doc) => allSupportedCollections.add((doc.data() as SupportedCollection).address));
 
       let count = 0;
-      console.log('Num trending collections to update social stats for:', allTrendingCollections.size);
-      for (const collection of allTrendingCollections) {
+      console.log('Num supported collections to update social stats for:', allSupportedCollections.size);
+      for (const collection of allSupportedCollections) {
         if (collection) {
           fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${collection}`)
             .then(() => {
@@ -118,9 +103,9 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
           await sleep(TRIGGER_TIMER);
         }
       }
-      console.log('UpdateSocialStatsTrigger - Total trending collections updated:', count);
+      console.log('UpdateSocialStatsTrigger - Total supported collections updated:', count);
     } catch (err) {
-      console.error('error updating social stats for trending collections', err);
+      console.error('error updating social stats for supported collections', err);
     }
   }
 }
