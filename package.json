@@ -39,7 +39,7 @@
   "dependencies": {
     "@discordjs/builders": "^1.1.0",
     "@discordjs/rest": "^1.0.1",
-    "@infinityxyz/lib": "^1.232.2",
+    "@infinityxyz/lib": "^1.307.1",
     "discord-api-types": "^0.37.2",
     "discord.js": "^14.2.0",
     "dotenv": "^16.0.0",
