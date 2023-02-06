@@ -18,11 +18,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   async setup(): Promise<void> {
-    const query = this.db
-      .collection(firestoreConstants.COLLECTIONS_COLL)
-      .where('metadata.links.twitter', '>', 'https://twitter.com/')
-      .where('hasBlueCheck', '==', true)
-      .limit(5000);
+    const query = this.db.collection(firestoreConstants.SUPPORTED_COLLECTIONS_COLL).limit(1000); // future todo: remove limit once we support more colls
 
     await this.deleteStreamRules();
     this.handlesInStream = new Set();
