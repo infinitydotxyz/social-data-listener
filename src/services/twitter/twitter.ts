@@ -18,7 +18,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   async setup(): Promise<void> {
-    const query = this.db.collection(firestoreConstants.SUPPORTED_COLLECTIONS_COLL).limit(1000); // future todo: remove limit once we support more colls
+    const query = this.db.collection(firestoreConstants.SUPPORTED_COLLECTIONS_COLL).where('isSupported', '==', true).limit(1000); // future todo: remove limit once we support more colls
 
     await this.deleteStreamRules();
     this.handlesInStream = new Set();
@@ -29,7 +29,9 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           const changes = snapshot.docChanges();
 
           const twitterHandlesAdded = changes
-            .filter((change) => change.type === 'added' && change.doc.data().metadata?.links?.twitter)
+            .filter(
+              (change) => change.type === 'added' && change.doc.data().metadata?.links?.twitter && change.doc.data().isSupported
+            )
             .map((change) => Twitter.extractHandle(change.doc.data().metadata.links.twitter))
             .filter((handle) => !!handle.trim())
             .filter((handle) => !this.handlesInStream.has(handle));

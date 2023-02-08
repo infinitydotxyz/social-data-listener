@@ -86,7 +86,7 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
       const allSupportedCollections = new Set<string>();
 
       const supportedColls = await supportedCollectionsRef
-        .orderBy('address', 'asc')
+        .where('isSupported', '==', true)
         .limit(1000) // future todo: change limit when we support more than 1000 colls
         .get();
       supportedColls.docs.map((doc) => allSupportedCollections.add((doc.data() as SupportedCollection).address));
