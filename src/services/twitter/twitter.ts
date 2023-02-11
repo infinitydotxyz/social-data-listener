@@ -210,6 +210,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
 
   monitor(handler: OnEvent<TwitterTweetEvent>): void {
     this.streamTweets(async (tweet) => {
+      console.log('Received tweet from', tweet.includes?.users?.[0]?.username, tweet.data.text);
       try {
         const media = tweet.includes?.media?.[0];
         const user = tweet.includes?.users?.[0];
@@ -254,6 +255,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
           if (doc) {
             const data = doc.data() as BaseCollection;
             if (data) {
+              console.log('Writing tweet to feed for collection', data.chainId, data.metadata?.name, data.address);
               handler({
                 ...event,
                 collectionAddress: data.address ?? '',
@@ -263,7 +265,11 @@ export class Twitter extends Listener<TwitterTweetEvent> {
                 chainId: data.chainId,
                 hasBlueCheck: data.hasBlueCheck ?? false
               });
+            } else {
+              console.warn('No collection data found for twitter username', username);
             }
+          } else {
+            console.warn('No collection record found for twitter username', username);
           }
         }
       } catch (err) {
