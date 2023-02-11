@@ -136,6 +136,12 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
       if (collectionData.size > 0) {
         const collection = collectionData.docs[0].data() as Collection;
 
+        console.log(
+          'Writing discord announcement to feed for collection',
+          collection.chainId,
+          collection.metadata?.name,
+          collection.address
+        );
         handler({
           id: msg.id,
           guildId: msg.reference?.guildId || msg.guildId!,
@@ -165,6 +171,13 @@ export class Discord extends Listener<DiscordAnnouncementEvent> {
           hasBlueCheck: collection.hasBlueCheck ?? false,
           internalUrl: ''
         });
+      } else {
+        console.warn(
+          'Discord message received but no collection found for guildId',
+          msg.reference?.guildId ?? msg.guild,
+          'channelId',
+          msg.channelId
+        );
       }
     });
 

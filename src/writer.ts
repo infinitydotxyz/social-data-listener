@@ -7,17 +7,18 @@ import { SocialFeedEvent } from './services';
  * @param event
  */
 export async function writer(event: SocialFeedEvent, db: FirebaseFirestore.Firestore) {
-  switch (event.type) {
-    case EventType.TwitterTweet:
-    case EventType.DiscordAnnouncement:
-      await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
-      console.log(`${event.type} event added to feed`);
-      break;
-    case EventType.CoinMarketCapNews:
-      await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
-      console.log(`${event.type} event added to feed`);
-      break;
-    default:
-      throw new Error(`Unexpected event '${event.type}'!`);
+  try {
+    switch (event.type) {
+      case EventType.TwitterTweet:
+      case EventType.DiscordAnnouncement:
+      case EventType.CoinMarketCapNews:
+        await db.collection(firestoreConstants.FEED_COLL).doc(event.id).set(event);
+        console.log(`${event.type} event added to feed`);
+        break;
+      default:
+        throw new Error(`Unexpected event '${event.type}'!`);
+    }
+  } catch (err) {
+    console.error('Error writing event', event, err);
   }
 }
