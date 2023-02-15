@@ -4,6 +4,7 @@ import { OrderDirection, StatsPeriod, SupportedCollection } from '@infinityxyz/l
 import { firestoreConstants } from '@infinityxyz/lib/utils/constants';
 import fetch from 'node-fetch';
 import { MAIN_API_URL } from '../../constants';
+import { SupportedCollectionsProvider } from '../../supported-collections-provider';
 
 const UPDATE_SOCIAL_STATS_ENDPOINT = `${MAIN_API_URL}/collections/update-social-stats?list=`;
 const TRIGGER_TIMER = 3000; // every 3s - due to twitter api rate limit
@@ -81,19 +82,13 @@ export class UpdateSocialStatsTrigger extends Listener<unknown> {
   async updateSupportedCollections() {
     console.log('Updating social stats for supported collections');
     try {
-      const supportedCollectionsRef = this.db.collection(firestoreConstants.SUPPORTED_COLLECTIONS_COLL);
-
-      const allSupportedCollections = new Set<string>();
-
-      const supportedColls = await supportedCollectionsRef
-        .where('isSupported', '==', true)
-        .limit(1000) // future todo: change limit when we support more than 1000 colls
-        .get();
-      supportedColls.docs.map((doc) => allSupportedCollections.add((doc.data() as SupportedCollection).address));
+      const supportedCollections = new SupportedCollectionsProvider(this.db);
+      await supportedCollections.init();
 
       let count = 0;
-      console.log('Num supported collections to update social stats for:', allSupportedCollections.size);
-      for (const collection of allSupportedCollections) {
+      const supportedCollsSet = supportedCollections.supportedCollSet();
+      console.log('Num supported collections to update social stats for:', supportedCollsSet.size);
+      for (const collection of supportedCollsSet) {
         if (collection) {
           fetch(`${UPDATE_SOCIAL_STATS_ENDPOINT}${collection}`)
             .then(() => {
