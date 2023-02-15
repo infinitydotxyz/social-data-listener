@@ -44,7 +44,6 @@ export class Twitter extends Listener<TwitterTweetEvent> {
             changes.some(
               (change) =>
                 (change.type === 'modified' &&
-                  change.doc.data().isSupported &&
                   !snapshot.docs.some(
                     (old) => old.data().metadata?.links?.twitter === change.doc.data().metadata?.links?.twitter
                   )) ||
