@@ -18,7 +18,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
   }
 
   async setup(): Promise<void> {
-    const query = this.db.collection(firestoreConstants.SUPPORTED_COLLECTIONS_COLL).where('isSupported', '==', true).limit(1000); // future todo: remove limit once we support more colls
+    const query = this.db.collection(firestoreConstants.SUPPORTED_COLLECTIONS_COLL).where('isSupported', '==', true).limit(1000); // future-todo: remove limit once we support more colls
 
     await this.deleteStreamRules();
     this.handlesInStream = new Set();
@@ -36,7 +36,7 @@ export class Twitter extends Listener<TwitterTweetEvent> {
             .filter((handle) => !!handle.trim())
             .filter((handle) => !this.handlesInStream.has(handle));
 
-          // TODO: properly handle 'modified' and 'removed' documents.
+          // future-TODO: properly handle 'modified' and 'removed' documents.
           // The problem is that we can't exactly delete or modify one exact rule because atm one rule monitors multiple accounts.
           // We might be able to get around this limitation once we can apply many more (and preferably unlimited) rules per twitter handle via some kind of commercial API access.
           // For the time being, we just inefficiently re-create the rule from scratch whenever a document is deleted or modified (only when twitter url changed).
