@@ -113,8 +113,6 @@ export class Twitter extends Listener<TwitterTweetEvent> {
     accessLevel: AccessLevel = AccessLevel.Essential,
     filter: string = '-is:retweet -is:reply -is:quote'
   ): StreamingV2AddRulesParams {
-    // TODO: check if there's a more performant (but also readable) way to do this...
-
     const placeholder = `()${filter.length ? ' ' + filter : ''}`;
     const concatenator = ' OR ';
     const rules: Array<{ value: string }> = [];

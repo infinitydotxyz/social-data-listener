@@ -22,7 +22,6 @@ export class CoinMarketCap extends Listener<CoinMarketCapNewsEvent> {
   async monitor(handler: OnEvent<CoinMarketCapNewsEvent>) {
     // executes the job every hour (CMC seems to update their articles every hour as well so)
     // see: https://github.com/node-schedule/node-schedule#cron-style-scheduling
-    // TODO: check which timezone CMC is using
     const job = schedule.scheduleJob(EventType.CoinMarketCapNews, '0 * * * *', async () => {
       const res = await phin({
         url: this.url,
